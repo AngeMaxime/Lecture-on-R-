@@ -1,0 +1,586 @@
+---
+title: "Lecture 12: Handling Missing Data in R — Detection, Visualisation, and Imputation"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width  = 8,
+  fig.height = 5
+)
+```
+
+---
+
+# Learning Objectives
+
+By the end of this lecture, you will be able to:
+
+- Understand the **three mechanisms** of missingness: MCAR, MAR, and MNAR
+- Quantify missing data using `summary()`, `is.na()`, `colSums()`, and `miss_var_summary()`
+- Visualise missing data patterns with `{naniar}`: `gg_miss_var()`, `vis_miss()`
+- Identify **relationships** between missingness and other variables using `ggplot2`
+- Apply four strategies for dealing with missing values: **do nothing**, **drop**, **replace**, and **impute**
+- Use `drop_na()`, `case_when()`, and `mutate()` for targeted removal and replacement
+- Implement the four main imputation methods: simple (mean/median), regression, KNN, and MICE multiple imputation
+- Apply the Predictive Mean Matching (`pmm`) method in `{mice}` with a custom predictor matrix
+- Understand when to use each method in a research context
+
+---
+
+# Understanding Missing Data
+
+## Why missing data is dangerous
+
+Missing values (`NA` in R) are not just an inconvenience — they can silently bias your results if not handled properly:
+
+- Most statistical tests and models **exclude rows with any missing values** by default
+- **Ad hoc deletions** can introduce systematic bias if missingness is related to the outcome
+- **Improper imputation** can narrow confidence intervals and produce false precision
+
+## The three mechanisms of missingness
+
+| Mechanism | Full name | Definition | Example |
+|---|---|---|---|
+| **MCAR** | Missing Completely At Random | Missing values have no relationship to any variable | Lab sample accidentally dropped |
+| **MAR** | Missing At Random | Missingness depends on **observed** variables, not the missing value itself | Older patients more likely to skip a questionnaire item |
+| **MNAR** | Missing Not At Random | Missingness depends on the **missing value itself** | Patients with very high cytokine levels are too ill to provide a sample |
+
+> **Why the distinction matters:** MCAR allows simple deletion without bias. MAR can be handled by proper imputation. MNAR is the most difficult and may require domain knowledge or sensitivity analyses.
+
+## Decision framework for missing data
+
+```
+Detect missing values
+        |
+        ├─── How much is missing?
+        │      < 5%  → simple imputation usually acceptable
+        │      5–30% → use regression or KNN imputation
+        │      > 30% → consider dropping the variable entirely
+        │
+        ├─── What is the mechanism?
+        │      MCAR → complete case analysis is unbiased
+        │      MAR  → multiple imputation (MICE) is preferred
+        │      MNAR → investigate source; consider sensitivity analyses
+        │
+        └─── What is the analysis goal?
+               Exploratory → Method 1 (simple) is sufficient
+               Publication/thesis → Method 4 (MICE) is required
+```
+
+---
+
+# Required Packages
+
+```{r load-packages}
+library(tidyverse)   # dplyr, ggplot2, tidyr
+library(naniar)      # Missing data visualisation
+library(VIM)         # KNN imputation + aggr plot
+library(mice)        # Multiple imputation
+library(gt)          # Publication tables
+library(gtExtras)    # Table themes
+```
+
+---
+
+# Part 1 — Quantifying Missing Data
+
+## Working Datasets
+
+We use two built-in R datasets throughout this lecture:
+
+- **`airquality`** — Daily air quality measurements, New York 1973. Contains missing `Ozone` and `Solar.R` values.
+- **`starwars`** — Star Wars characters. Many variables (mass, hair_color) contain `NA`.
+
+```{r preview-data}
+head(airquality)
+head(starwars[, 1:7])
+```
+
+## Base R methods
+
+```{r magnitude-basic}
+# Total NAs in the entire dataset
+cat("Total NAs in airquality:", sum(is.na(airquality)), "\n")
+
+# NAs per variable
+colSums(is.na(airquality))
+```
+
+```{r summary-method}
+# summary() shows NA counts for each variable
+summary(airquality)
+```
+
+## Tidyverse summary table with `{naniar}`
+
+```{r miss-var-summary}
+miss_var_summary(airquality) |>
+  gt() |>
+  tab_header(title = "Missing values per variable — airquality") |>
+  cols_align("left") |>
+  cols_label(
+    variable  = "Variable",
+    n_miss    = "N missing",
+    pct_miss  = "% missing"
+  ) |>
+  gt_theme_guardian()
+```
+
+> `miss_var_summary()` returns a tidy data frame with the count and percentage of missing values for each variable — much easier to work with than `colSums()` for downstream filtering.
+
+## Visualising missing magnitude with `gg_miss_var()`
+
+```{r gg-miss-var}
+gg_miss_var(airquality) +
+  labs(
+    title = "Number of missing values per variable — airquality",
+    y     = "Count of NAs"
+  ) +
+  theme_minimal()
+```
+
+## Extracting rows that contain missing values
+
+```{r missing-rows}
+airquality |>
+  filter(!complete.cases(.)) |>   # Keep only rows with at least one NA
+  head(10) |>
+  gt() |>
+  tab_header(title = "Rows that contain at least one missing value") |>
+  gt_theme_guardian()
+```
+
+> `complete.cases(.)` returns `TRUE` for rows with **no** missing values. The `!` negates it, keeping only incomplete rows.
+
+---
+
+# Part 2 — Visualising the Distribution of Missingness
+
+## `vis_miss()` — The Missing Data Map
+
+`vis_miss()` produces a tile plot of the entire dataset: each row is an observation, each column is a variable, and tiles are coloured by presence/absence of data.
+
+```{r vis-miss}
+vis_miss(airquality) +
+  labs(title = "Missing data map — airquality") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+> **How to read this plot:** Black tiles = missing, grey = present. Patterns of aligned black tiles across rows reveal **co-missingness** — variables that tend to be missing at the same time.
+
+## MICE Missing Pattern with `md.pattern()`
+
+```{r md-pattern}
+md.pattern(airquality, plot = TRUE, rotate.names = TRUE)
+```
+
+> Each row in this matrix is a **distinct missingness pattern**. The number on the left is the count of observations with that pattern. The number on the right is how many variables are missing. The bottom row shows the total count of NAs per variable.
+
+## VIM Aggregation Plot with `aggr()`
+
+```{r aggr-plot, fig.height=5}
+aggr(airquality,
+     prop    = TRUE,
+     numbers = TRUE,
+     cex.axis = 0.8,
+     main    = "Missing data patterns — airquality")
+```
+
+---
+
+# Part 3 — Relationship Between Missingness and Other Variables
+
+Understanding **why** data is missing is as important as knowing **how much** is missing.
+
+## Histogram: Distribution of Wind for Missing vs Non-missing Ozone
+
+```{r miss-relationship-hist}
+airquality |>
+  mutate(
+    Missing_ozone = factor(
+      is.na(Ozone),
+      levels = c(FALSE, TRUE),
+      labels = c("Observed", "Missing")
+    )
+  ) |>
+  ggplot(aes(x = Wind, fill = Missing_ozone)) +
+  geom_histogram(binwidth = 1, position = "stack", alpha = 0.8) +
+  scale_fill_manual(values = c("Observed" = "steelblue", "Missing" = "firebrick")) +
+  labs(
+    title    = "Wind speed distribution — Ozone missing vs observed",
+    subtitle = "If missing Ozone is concentrated at specific wind speeds, missingness is MAR",
+    x        = "Wind Speed (mph)",
+    y        = "Count",
+    fill     = "Ozone status"
+  ) +
+  theme_bw()
+```
+
+## Scatter Plot: Wind vs Temperature Coloured by Ozone Missingness
+
+```{r miss-relationship-scatter}
+airquality |>
+  select(Ozone, Solar.R, Wind, Temp) |>
+  ggplot(aes(x = Wind,
+             y = Temp,
+             size  = Solar.R,
+             color = is.na(Ozone))) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ is.na(Ozone),
+             labeller = labeller(`is.na(Ozone)` = c("FALSE" = "Ozone observed",
+                                                      "TRUE"  = "Ozone missing"))) +
+  scale_color_manual(values = c("FALSE" = "steelblue", "TRUE" = "firebrick")) +
+  labs(
+    title    = "Missing Ozone data — relationship with Wind and Temperature",
+    subtitle = "Panel left: Ozone observed | Panel right: Ozone missing",
+    x        = "Wind Speed (mph)",
+    y        = "Temperature (°F)",
+    color    = "Ozone missing?",
+    size     = "Solar radiation"
+  ) +
+  theme_bw() +
+  theme(legend.position = "bottom")
+```
+
+> **Interpretation:** If the right panel (missing Ozone) shows a different Wind/Temperature pattern than the left panel, Ozone missingness is **MAR** (related to observed Wind/Temperature), not MCAR.
+
+---
+
+# Part 4 — Strategies for Handling Missing Data
+
+## Strategy Overview
+
+| Strategy | When to use | Risk |
+|---|---|---|
+| **Do nothing** | Analysis functions handle NAs internally (e.g., `na.rm = TRUE`) | Results depend on how each function handles NAs |
+| **Delete** | MCAR, < 5% missing, large dataset | Reduces sample size; biased if not MCAR |
+| **Replace** | Logical/contextual reason (e.g., Droid has no hair) | Can distort distribution if not justified |
+| **Impute** | MAR, moderate missingness (5–30%), research publication | Complex; must choose method appropriately |
+
+---
+
+## Method 1 — Dropping Missing Values
+
+### Visualise which rows will be dropped
+
+```{r highlight-na}
+starwars |>
+  select(name, mass, height, hair_color) |>
+  head(15) |>
+  gt() |>
+  tab_header(title = "Star Wars characters — missing values highlighted") |>
+  gt_theme_guardian() |>
+  gt_highlight_rows(rows = is.na(mass),       fill = "steelblue") |>
+  gt_highlight_rows(rows = is.na(hair_color), fill = "lightpink")
+```
+
+### Drop NAs from a specific column only
+
+```{r drop-na-column}
+starwars |>
+  select(name, mass, height, hair_color) |>
+  drop_na(mass) |>                  # Only drop rows where mass is NA
+  head(20) |>
+  gt() |>
+  tab_header(title = "After drop_na(mass) — other NAs remain") |>
+  gt_theme_guardian()
+```
+
+> **Key distinction:** `drop_na(mass)` removes only rows where `mass` is missing — other columns like `hair_color` may still contain NAs. Use `drop_na()` (no argument) to remove any row with ANY missing value.
+
+---
+
+## Method 2 — Replacing NAs with a Logical Value
+
+Sometimes `NA` has a meaningful interpretation. In Star Wars, Droids have no hair, so `NA` in `hair_color` for Droids should become `"none"`.
+
+```{r replace-na-logic}
+starwars |>
+  select(name, hair_color, species) |>
+  filter(species == "Droid") |>
+  mutate(
+    hair_color = case_when(
+      is.na(hair_color) & species == "Droid" ~ "none",   # Replace NA for Droids
+      TRUE ~ hair_color                                   # Keep all other values
+    )
+  ) |>
+  gt() |>
+  tab_header(title = "Droids — NA hair_color replaced with 'none'") |>
+  gt_theme_guardian()
+```
+
+---
+
+## Method 3 — Simple Imputation (Mean/Median)
+
+Replace missing values with a summary statistic. This is fast and simple, but it **reduces variance** and can distort relationships between variables.
+
+### Median imputation for `height` in `starwars`
+
+```{r impute-median}
+# Show which characters have missing height
+starwars |>
+  select(name, height) |>
+  filter(is.na(height)) |>
+  gt() |>
+  tab_header(title = "Characters with missing height") |>
+  gt_theme_guardian()
+```
+
+```{r impute-median-replace}
+imputed_median <- starwars |>
+  mutate(
+    height = case_when(
+      is.na(height) ~ median(starwars$height, na.rm = TRUE),  # Replace with overall median
+      TRUE          ~ as.double(height)                        # Keep all other values
+    )
+  ) |>
+  select(name, height) |>
+  arrange(name)
+
+imputed_median |>
+  gt() |>
+  tab_header(
+    title    = "Heights after median imputation",
+    subtitle = paste("Median used:", median(starwars$height, na.rm = TRUE), "cm")
+  ) |>
+  gt_theme_guardian() |>
+  gt_highlight_rows(
+    rows = name %in% c("Arvel Crynyd", "Poe Dameron", "BB8", "Finn", "Captain Phasma"),
+    fill = "steelblue"
+  )
+```
+
+### Group-wise mean imputation (best practice for clinical data)
+
+When data contains groups (e.g., disease categories, species), impute **within** each group to preserve biological differences:
+
+```{r group-imputation}
+starwars |>
+  filter(!is.na(species)) |>
+  group_by(species) |>
+  mutate(
+    mass_imputed = ifelse(
+      is.na(mass),
+      mean(mass, na.rm = TRUE),   # Group-wise mean
+      mass
+    )
+  ) |>
+  ungroup() |>
+  select(name, species, mass, mass_imputed) |>
+  filter(name %in% c("R2-D2", "R5-D4", "IG-88", "C-3PO")) |>
+  gt() |>
+  tab_header(title = "Group-wise mean imputation example") |>
+  gt_theme_guardian()
+```
+
+---
+
+## Method 4 — KNN Imputation with `{VIM}`
+
+K-Nearest Neighbours (KNN) imputation finds the `k` most similar observations (based on complete variables) and uses their average to fill in the missing value. This preserves relationships between variables better than simple mean imputation.
+
+```{r knn-imputation}
+# Use the sleep dataset (built into VIM)
+data(sleep)
+cat("NAs before KNN imputation:", sum(is.na(sleep)), "\n")
+
+# Apply KNN imputation (k = 5 nearest neighbours)
+sleep_knn <- kNN(sleep, k = 5)
+
+cat("NAs after KNN imputation:", sum(is.na(sleep_knn[, names(sleep)])), "\n")
+```
+
+```{r knn-check}
+# kNN adds indicator columns (_imp) — remove them for a clean dataset
+sleep_clean <- sleep_knn[, names(sleep)]
+summary(sleep_clean)
+```
+
+**KNN parameters:**
+
+| Parameter | Meaning |
+|---|---|
+| `variable` | Which columns to impute (default: all with NAs) |
+| `k` | Number of nearest neighbours (try k = 5 to k = 10) |
+| `dist_var` | Variables used to compute distances (default: all) |
+
+---
+
+## Method 5 — Multiple Imputation with MICE
+
+**MICE** (Multivariate Imputation by Chained Equations) is the gold standard for research publications. It:
+
+1. Creates **m = 5** (or more) complete datasets, each with slightly different imputed values
+2. Runs your statistical analysis on each dataset separately
+3. **Pools** the results using Rubin's rules to give valid inference
+
+### Running MICE on the `airquality` dataset
+
+```{r mice-imputation}
+set.seed(123)
+
+# Step 1: Run MICE
+imputed_mice <- mice(
+  airquality,
+  m      = 5,        # Create 5 complete datasets
+  maxit  = 50,       # Run 50 cycles of the imputation algorithm
+  method = "pmm",    # Predictive Mean Matching — draws real observed values
+  print  = FALSE     # Suppress iteration output
+)
+
+# Step 2: Inspect what MICE did
+imputed_mice$method    # Method used per variable
+```
+
+```{r mice-convergence, fig.height=4}
+# Step 3: Check convergence — lines should mix and overlap well
+plot(imputed_mice)
+```
+
+```{r mice-extract}
+# Step 4: Extract one complete dataset
+airquality_complete <- complete(imputed_mice, action = 1)
+
+cat("NAs before MICE:", sum(is.na(airquality)), "\n")
+cat("NAs after MICE: ", sum(is.na(airquality_complete)), "\n")
+```
+
+### MICE key parameters explained
+
+| Parameter | Meaning |
+|---|---|
+| `m = 5` | Creates 5 complete datasets with different plausible imputed values |
+| `maxit = 50` | Runs 50 cycles to ensure the algorithm converges |
+| `method = "pmm"` | **Predictive Mean Matching** — only draws real observed values, so no impossible negatives |
+| `complete(action = 1)` | Extract dataset 1 of 5 for practical use |
+| `complete(action = "long")` | Extract all 5 stacked — required for pooled inference |
+
+### Building a custom predictor matrix
+
+In clinical research, you should only use variables with **zero missing values** as predictors:
+
+```{r custom-predictor}
+# Only use complete variables as predictors
+pred_matrix <- make.predictorMatrix(airquality)
+
+# Zero out all relationships first
+pred_matrix[, ] <- 0
+
+# Specify which variables predict which
+# Ozone predicted by Wind and Temp (both complete)
+pred_matrix["Ozone",   c("Wind", "Temp")] <- 1
+# Solar.R predicted by Wind and Temp
+pred_matrix["Solar.R", c("Wind", "Temp")] <- 1
+
+print(pred_matrix)
+```
+
+```{r mice-custom}
+set.seed(456)
+
+imputed_custom <- mice(
+  airquality,
+  m               = 5,
+  maxit           = 30,
+  method          = "pmm",
+  predictorMatrix = pred_matrix,
+  print           = FALSE
+)
+
+airquality_custom <- complete(imputed_custom, action = 1)
+cat("NAs after custom MICE:", sum(is.na(airquality_custom)), "\n")
+```
+
+### For full research: pooling across all 5 datasets
+
+```{r mice-pool, eval=FALSE}
+# Run a linear model on each of the 5 imputed datasets
+fit <- with(imputed_mice, lm(Ozone ~ Wind + Temp + Solar.R))
+
+# Pool results using Rubin's rules
+pooled <- pool(fit)
+summary(pooled)
+```
+
+> ⚠️ **Gold standard:** For a publication or thesis, **always pool results** across all `m` datasets using `pool()`. Do NOT simply pick one completed dataset and proceed as if there was never any missingness.
+
+---
+
+# Part 5 — Choosing the Right Method
+
+## Decision table
+
+| Situation | Recommended method |
+|---|---|
+| Quick exploratory analysis | **Simple imputation** (mean/median) |
+| Known biological/clinical predictors available | **Regression imputation** |
+| No model assumptions; structured data | **KNN (VIM)** |
+| Research publication / thesis / clinical trial | **MICE multiple imputation** |
+
+## The three key lessons
+
+1. **Always check column names for special characters** before running `mice()`. Characters like `-`, `(`, `)`, and spaces break R formulas. Rename to safe names using `make.names()` or manual renaming, and restore original names after `complete()`.
+
+2. **Only use complete variables as predictors.** Run `names(df)[colSums(is.na(df)) == 0]` to identify them before building your predictor matrix.
+
+3. **Impute within biological groups.** Use `group_by()` when computing group-specific means/medians to preserve real biological differences between patient categories.
+
+---
+
+# Summary
+
+| Task | Function / approach |
+|---|---|
+| Count total NAs | `sum(is.na(df))` |
+| NAs per column | `colSums(is.na(df))` |
+| Tidy missingness summary | `miss_var_summary(df)` |
+| Bar chart of missingness | `gg_miss_var(df)` |
+| Missing data tile map | `vis_miss(df)` |
+| Pattern matrix | `md.pattern(df)` |
+| VIM aggregation plot | `aggr(df)` |
+| Keep only incomplete rows | `filter(!complete.cases(.))` |
+| Drop NAs by column | `drop_na(column)` |
+| Replace by condition | `mutate(x = case_when(is.na(x) ~ value, TRUE ~ x))` |
+| KNN imputation | `kNN(df, k = 5)` |
+| MICE imputation | `mice(df, m = 5, method = "pmm")` |
+| Extract MICE result | `complete(imputed, action = 1)` |
+| Pool MICE models | `pool(with(imputed, lm(...)))` |
+
+---
+
+# Practice Exercises
+
+1. Using the `airquality` dataset, compute the percentage of missing values in `Ozone` and `Solar.R`. Are these below or above the 5% threshold for simple imputation?
+
+2. Create a histogram of `Temp` coloured by whether `Solar.R` is missing. Is the distribution of temperature different for missing vs observed Solar.R? What does this tell you about the mechanism?
+
+3. Apply `kNN()` from `{VIM}` to the `sleep` dataset with `k = 3`. Compare the distribution of the imputed values to the original `summary()`.
+
+4. Use `mice()` with `method = "pmm"` and `m = 3` to impute the `airquality` dataset. Extract dataset 2 with `complete(action = 2)`. Compare the mean of `Ozone` before and after imputation.
+
+5. *Challenge:* For a dataset of your choice that has > 5% missing in at least two variables, build a custom predictor matrix and run a full MICE workflow. Pool a linear regression result across all 5 imputed datasets using `pool()`.
+
+---
+
+# References
+
+- van Buuren, S. (2018). *Flexible Imputation of Missing Data* (2nd ed.). https://stefvanbuuren.name/fimd/
+- Sterne, J. A. C., et al. (2009). Multiple imputation for missing data in epidemiological and clinical research. *BMJ*, 338, b2393.
+- Kowarik, A. & Templ, M. (2016). Imputation with the R Package VIM. *Journal of Statistical Software*, 74(7).
+- naniar package: https://naniar.njtierney.com

@@ -1,0 +1,811 @@
+---
+title: "Importing and Exporting Data in R"
+subtitle: "A Comprehensive Lecture — From Local Files to APIs and Databases"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##",
+  message = FALSE,
+  warning = FALSE,
+  eval    = FALSE   # Most import chunks reference external files; set eval=FALSE globally
+)
+# Only exploratory chunks that use built-in data will use eval=TRUE
+```
+
+---
+
+# Introduction
+
+Every real data analysis begins with the same step: **getting your data into R**. Researchers and analysts work with data stored in many different formats — spreadsheets, comma-separated files, text files, statistical software exports, and online databases. Knowing how to import all of them efficiently is a foundational skill.
+
+In this lecture we cover:
+
+- **The working directory** — where R looks for files
+- **Base R import functions** — `read.csv()`, `read.table()`, `read.delim()`
+- **Modern tidyverse import** — `readr` package
+- **Fast import for large data** — `data.table::fread()`
+- **Excel files** — `readxl` package
+- **SPSS, Stata, SAS** — `haven` package
+- **Online / URL files** — reading directly from the web
+- **The `rio` package** — universal import/export
+- **Inspecting imported data** — first steps after loading
+- **Exporting data** — `write.csv()`, `write_csv()`, `fwrite()`, RData, RDS
+- **Saving and reloading R objects** — `.RData` and `.rds`
+- **data.frame vs tibble vs data.table** — understanding the three tabular formats
+- **A complete real-world workflow**
+
+---
+
+# The Working Directory
+
+The **working directory** is the folder on your computer where R looks for files when you use a filename without a full path. Always set it at the start of any session.
+
+```{r wd}
+getwd()                      # Print the current working directory
+
+setwd("path/to/your/data")   # Change to a specific folder
+# Example on Windows:
+# setwd("C:/Users/Ange/Documents/my_project")
+# Example on Mac/Linux:
+# setwd("/home/ange/my_project")
+```
+
+> 💡 **RStudio shortcut:** In RStudio, go to **Session → Set Working Directory → To Source File Location** to automatically set the working directory to the folder where your current script is saved.
+
+> 💡 **Best practice:** Use **RStudio Projects** (`.Rproj` files). When you open a Project, the working directory is automatically set to the project folder — you never need `setwd()` again.
+
+---
+
+# Understanding File Formats
+
+Before importing, you must know what format your data is in. The most common formats are:
+
+| Format | Extension | Separator | Notes |
+|---|---|---|---|
+| Comma-Separated Values | `.csv` | `,` | Most universal format |
+| CSV (European) | `.csv` | `;` | Used when `,` is the decimal separator |
+| Tab-Separated Values | `.tsv` or `.txt` | `\t` | Common in bioinformatics |
+| Fixed-width text | `.txt` | spaces | Legacy format |
+| Excel | `.xlsx`, `.xls` | — | Microsoft spreadsheet |
+| SPSS | `.sav` | — | Statistical software |
+| Stata | `.dta` | — | Statistical software |
+| SAS | `.sas7bdat` | — | Statistical software |
+| R binary | `.RData`, `.rds` | — | Native R formats |
+
+---
+
+# Base R Import Functions
+
+## `read.csv()` — Comma-Separated Values
+
+`read.csv()` is the most frequently used import function. It reads a `.csv` file and returns a `data.frame`.
+
+```{r read-csv}
+# Read a local CSV file
+data <- read.csv("columbus.csv")
+
+# View as a spreadsheet in RStudio
+View(data)
+
+# Display the first few rows in the console
+head(data)
+```
+
+### Key arguments of `read.csv()`
+
+```{r read-csv-args}
+data <- read.csv(
+  file      = "myfile.csv",  # path to file
+  header    = TRUE,          # first row contains column names (default TRUE)
+  sep       = ",",           # column separator (default comma)
+  dec       = ".",           # decimal point character (default ".")
+  na.strings = "NA",         # what strings to treat as missing values
+  stringsAsFactors = FALSE,  # keep character columns as strings (recommended)
+  skip      = 0,             # number of lines to skip at the top
+  nrows     = -1,            # how many rows to read (-1 = all)
+  encoding  = "UTF-8"        # file encoding
+)
+```
+
+## `read.csv2()` — European CSV (semicolon-separated)
+
+Used in countries where the decimal separator is a comma (`,`), so the field separator is a semicolon (`;`):
+
+```{r read-csv2}
+# Semicolon-separated, comma as decimal point
+data_eu <- read.csv2("european_data.csv")
+
+# Equivalent using read.table():
+data_eu <- read.table("european_data.csv", header = TRUE,
+                      sep = ";", dec = ",")
+```
+
+## `read.table()` — General Text Files
+
+The most flexible base R import function. All other `read.*` functions are wrappers around it:
+
+```{r read-table}
+# Tab-separated file with a header
+data_tab <- read.table("data.txt", header = TRUE, sep = "\t")
+
+# Comma-separated (same as read.csv)
+data_csv <- read.table("data.csv", header = TRUE, sep = ",")
+
+# No header row
+data_noheader <- read.table("data.txt", header = FALSE, sep = "\t")
+```
+
+## `read.delim()` — Tab-Separated Files
+
+A convenience wrapper for tab-separated files:
+
+```{r read-delim}
+# Tab-separated (default separator is \t)
+data_tsv <- read.delim("annotations.tsv")
+
+# Equivalent to:
+data_tsv <- read.table("annotations.tsv", header = TRUE, sep = "\t")
+```
+
+## `file.choose()` — Interactive File Picker
+
+Opens a dialog box to let you navigate and pick a file manually:
+
+```{r file-choose}
+# Opens the file browser — useful for beginners or one-off imports
+data <- read.csv(file.choose())
+data <- read.delim(file.choose())
+```
+
+> ⚠️ `file.choose()` is convenient interactively but **not reproducible** — never use it in scripts intended for others or for automation.
+
+---
+
+# Reading Online / URL Files
+
+You can pass a URL directly to any import function instead of a local path. R will download and read the file automatically:
+
+```{r read-url}
+# Read a CSV directly from the web
+url_csv <- "https://s3.amazonaws.com/assets.datacamp.com/blog_assets/test.csv"
+df <- read.csv(url_csv, header = FALSE)
+
+# Read a text file from the web
+url_txt <- "https://s3.amazonaws.com/assets.datacamp.com/blog_assets/test.txt"
+df_txt <- read.table(url_txt, header = FALSE)
+
+# Read a tab-separated file from GitHub
+url_tsv <- "https://raw.githubusercontent.com/HackBio-Internship/public_datasets/main/metadata_sample.tsv"
+bio_data <- read.csv(url_tsv)
+```
+
+> 💡 **No download needed.** R streams the file directly from the internet. If you need to work offline later, save the file locally first using `download.file()`.
+
+```{r download-file}
+# Download the file first, then read it locally
+download.file(url = "https://example.com/data.csv",
+              destfile = "local_data.csv")
+data <- read.csv("local_data.csv")
+```
+
+---
+
+# Modern Import: The `readr` Package
+
+The `readr` package (part of the tidyverse) provides faster, more consistent import functions. Function names use underscores instead of dots (`read_csv` vs `read.csv`) and return a **tibble** instead of a `data.frame`.
+
+```{r readr-install, eval=FALSE}
+install.packages("readr")   # or install.packages("tidyverse")
+library(readr)
+```
+
+## `read_csv()` — Fast CSV Import
+
+```{r read-csv-readr}
+library(readr)
+
+data_tb <- read_csv("myfile.csv")
+
+# With options:
+data_tb <- read_csv(
+  "myfile.csv",
+  col_names   = TRUE,            # first row is column names
+  na          = c("", "NA", "."), # values treated as missing
+  skip        = 0,               # skip header lines
+  n_max       = Inf,             # max rows to read
+  col_types   = NULL             # auto-detect or specify manually
+)
+```
+
+### Key differences: `read.csv()` vs `read_csv()`
+
+| Feature | `read.csv()` (base R) | `read_csv()` (readr) |
+|---|---|---|
+| Output type | `data.frame` | `tibble` |
+| Speed | Slower | Faster |
+| Printing | Shows all columns | Smart truncation |
+| `stringsAsFactors` | Default `FALSE` (R ≥ 4.0) | Never creates factors |
+| Column type messages | None | Reports inferred types |
+| Whitespace in names | Kept as-is | Preserved, shown with backticks |
+
+## Other `readr` Functions
+
+```{r readr-other}
+library(readr)
+
+read_csv2("data.csv")             # Semicolon-separated
+read_tsv("data.tsv")              # Tab-separated
+read_delim("data.txt", delim="|") # Custom delimiter
+read_fwf("data.fwf",              # Fixed-width format
+         fwf_widths(c(10, 8, 5)))
+```
+
+---
+
+# Fast Import for Large Data: `data.table::fread()`
+
+For datasets with **millions of rows**, `fread()` from the `data.table` package is the fastest option in R — often 5–10× faster than `read.csv()`:
+
+```{r fread}
+# install.packages("data.table")
+library(data.table)
+
+# Auto-detects separator, header, types — returns a data.table
+dt <- fread("large_dataset.csv")
+
+# With options
+dt <- fread(
+  "large_dataset.csv",
+  sep       = ",",
+  header    = TRUE,
+  nrows     = 10000,     # Read only first 10,000 rows
+  select    = c("col1", "col2"),  # Import only specific columns
+  na.strings = "NA"
+)
+```
+
+> 💡 `fread()` prints the 5 first and 5 last rows automatically, making it easy to verify what was loaded.
+
+---
+
+# Reading Excel Files: `readxl`
+
+Base R cannot read `.xlsx` files natively. Use the `readxl` package:
+
+```{r readxl}
+# install.packages("readxl")
+library(readxl)
+
+# Read the first sheet
+data_xl <- read_excel("data.xlsx")
+
+# Specify a sheet by name or number
+data_xl <- read_excel("data.xlsx", sheet = "Sheet2")
+data_xl <- read_excel("data.xlsx", sheet = 2)
+
+# Read only a specific range
+data_xl <- read_excel("data.xlsx", range = "A1:E50")
+
+# Skip rows, set column names
+data_xl <- read_excel("data.xlsx", skip = 2, col_names = TRUE)
+
+# List all sheets in a workbook
+excel_sheets("data.xlsx")
+
+head(data_xl)
+```
+
+---
+
+# Reading SPSS, Stata, and SAS Files: `haven`
+
+The `haven` package reads files from the three major statistical software systems:
+
+```{r haven}
+# install.packages("haven")
+library(haven)
+
+# SPSS (.sav)
+spss_data  <- read_sav("data.sav")
+
+# Stata (.dta)
+stata_data <- read_dta("data.dta")
+
+# SAS (.sas7bdat)
+sas_data   <- read_sas("data.sas7bdat")
+
+# All three return labelled tibbles that preserve the original variable labels
+```
+
+> 💡 `haven` preserves SPSS/Stata **variable labels** and **value labels** as attributes. Use `as_factor()` to convert labelled values to factors.
+
+---
+
+# Universal Import/Export: `rio`
+
+The `rio` package provides a single `import()` function that automatically detects the file format from the extension:
+
+```{r rio}
+# install.packages("rio")
+library(rio)
+
+# Import — works for CSV, Excel, SPSS, Stata, SAS, JSON, RDS, etc.
+data <- import("myfile.csv")
+data <- import("myfile.xlsx")
+data <- import("myfile.sav")
+data <- import("myfile.dta")
+
+# Export — equally universal
+export(data, "output.csv")
+export(data, "output.xlsx")
+export(data, "output.dta")
+
+# Convert between formats in one step
+convert("data.sav", "data.csv")
+```
+
+`rio` is the simplest option when you need to handle many file formats without memorizing different function names.
+
+---
+
+# The RStudio Import Interface
+
+RStudio provides a point-and-click import tool that generates the corresponding R code for you:
+
+**File → Import Dataset → From Text (readr) / From Excel / From SPSS / From Stata / From SAS**
+
+This opens a dialog where you can preview the data, adjust settings (separator, header, column types), and then copy the auto-generated code into your script.
+
+> 💡 **Always copy the generated code into your script.** Clicking "Import" runs the code interactively but does not save it — you need the code to make your analysis reproducible.
+
+---
+
+# Inspecting Imported Data
+
+After importing, always inspect your data before starting any analysis. This prevents wasted time on analyses built on misread columns or wrong types.
+
+```{r inspect, eval=TRUE}
+# Using the built-in airquality dataset as a stand-in
+data <- airquality
+
+# Basic dimensions
+dim(data)          # Rows × Columns
+nrow(data)         # Number of rows (observations)
+ncol(data)         # Number of columns (variables)
+length(data)       # Same as ncol for data frames
+
+# Column names and types
+names(data)        # Variable names
+str(data)          # Structure: type + first values of each column
+
+# Preview the data
+head(data)         # First 6 rows
+head(data, 10)     # First 10 rows
+tail(data)         # Last 6 rows
+
+# Statistical summary
+summary(data)      # Min, Q1, Median, Mean, Q3, Max per column
+
+# Missing values
+is.na(data) |> colSums()      # Count NAs per column
+colSums(is.na(data))          # Same result
+data[!complete.cases(data), ] # Rows that contain at least one NA
+
+# Column types
+sapply(data, class)   # Type of each column
+sapply(data, typeof)  # Underlying storage type
+
+# Unique values per column
+sapply(data, function(x) length(unique(x)))
+```
+
+## Fixing Column Types After Import
+
+Sometimes R guesses column types wrong. Fix them immediately after import:
+
+```{r fix-types}
+# Suppose 'age' was read as character
+data$age <- as.integer(data$age)
+
+# Suppose 'group' should be a factor
+data$group <- as.factor(data$group)
+
+# Suppose a date column was read as character
+data$date <- as.Date(data$date, format = "%Y-%m-%d")
+
+# Check the fix
+str(data)
+```
+
+---
+
+# Exporting Data
+
+## Writing CSV Files
+
+```{r write-csv}
+# Base R: creates CSV with row numbers column (row.names = TRUE by default)
+write.csv(data, file = "output.csv")
+
+# Cleaner: remove the row names column
+write.csv(data, file = "output.csv", row.names = FALSE)
+
+# Semicolon-separated (European format)
+write.csv2(data, file = "output_eu.csv", row.names = FALSE)
+```
+
+## Writing Text and Tab-Separated Files
+
+```{r write-table}
+# Tab-separated text file
+write.table(data, file = "output.txt",
+            sep       = "\t",
+            row.names = FALSE,
+            quote     = FALSE)   # Don't wrap strings in quotes
+```
+
+## Writing with `readr` (Modern Approach)
+
+```{r write-readr}
+library(readr)
+
+write_csv(data, "output.csv")       # No row names by default
+write_tsv(data, "output.tsv")       # Tab-separated
+write_csv2(data, "output_eu.csv")   # Semicolon-separated
+```
+
+## Writing with `data.table::fwrite()` (Fastest)
+
+```{r fwrite}
+library(data.table)
+
+fwrite(data, file = "output.csv")             # Default CSV
+fwrite(data, file = "output.tsv", sep = "\t") # TSV
+```
+
+## Compressing Files
+
+```{r write-compressed}
+# Save as compressed bz2 file
+write.csv(data, file = bzfile("output.csv.bz2"))
+
+# gzip compression
+write.csv(data, file = gzfile("output.csv.gz"))
+```
+
+---
+
+# Saving and Loading R Objects
+
+## `.RData` — Save Multiple Objects
+
+`.RData` (or `.Rda`) saves **multiple R objects** (data frames, vectors, models, functions — anything) into a single binary file. When loaded, all saved objects reappear in your environment with their original names.
+
+```{r rdata}
+# Save multiple objects
+a <- c(5, 10, 15)
+b <- data.frame(x = 1:3, y = c("a", "b", "c"))
+c <- lm(mpg ~ wt, data = mtcars)
+
+save(a, b, c, file = "my_objects.RData")
+
+# Remove them from environment
+rm(a, b, c)
+
+# Reload — a, b, c reappear automatically
+load("my_objects.RData")
+
+# Save your entire workspace
+save.image(file = "workspace_session.RData")
+load("workspace_session.RData")
+```
+
+## `.rds` — Save a Single Object
+
+`.rds` saves **one R object**. When you load it, you assign it to any variable name you choose — giving you more control than `.RData`:
+
+```{r rds}
+# Save a single data frame
+saveRDS(data, file = "clean_data.rds")
+
+# Remove it
+rm(data)
+
+# Reload under any name you like
+clean_data <- readRDS("clean_data.rds")
+my_dataset <- readRDS("clean_data.rds")   # Different name, same content
+```
+
+### `.RData` vs `.rds` — When to Use Which
+
+| Feature | `.RData` / `.Rda` | `.rds` |
+|---|---|---|
+| Number of objects | Multiple | One |
+| Load syntax | `load("file.RData")` | `obj <- readRDS("file.rds")` |
+| Object names | Fixed (original names) | Freely chosen on load |
+| Typical use | Saving a full session | Saving a single clean dataset |
+
+---
+
+# The Three Tabular Formats: data.frame, tibble, data.table
+
+R has three main tabular data structures, each suited for different workflows:
+
+## Creating Each Format
+
+```{r three-formats}
+library(tibble)
+library(data.table)
+
+# Classic data.frame (base R)
+df <- data.frame(
+  name = c("Alice", "Bob", "Carla"),
+  age  = c(25, 30, 22)
+)
+
+# Tibble (tidyverse)
+tb <- tibble(
+  name = c("Alice", "Bob", "Carla"),
+  age  = c(25, 30, 22)
+)
+
+# data.table (high performance)
+dt <- data.table(
+  name = c("Alice", "Bob", "Carla"),
+  age  = c(25, 30, 22)
+)
+```
+
+## Converting Between Formats
+
+```{r convert-formats}
+# To data.frame
+as.data.frame(tb)    # tibble → data.frame
+as.data.frame(dt)    # data.table → data.frame
+
+# To tibble
+as_tibble(df)        # data.frame → tibble
+as_tibble(dt)        # data.table → tibble
+
+# To data.table
+as.data.table(df)    # data.frame → data.table
+as.data.table(tb)    # tibble → data.table
+```
+
+## Comparison Table
+
+| Feature | `data.frame` | `tibble` | `data.table` |
+|---|---|---|---|
+| Package | Base R | `tibble` / tidyverse | `data.table` |
+| Speed | Moderate | Moderate | Very fast |
+| Printing | All columns | Smart truncation, type labels | First + last 5 rows |
+| Column types | Infers factors | Never creates factors | Never creates factors |
+| Syntax | `df[row, col]` | `df[row, col]` | `dt[i, j, by]` |
+| Best for | General use | Tidyverse workflows | Large datasets |
+
+---
+
+# A Complete Real-World Workflow
+
+Here is how all the pieces fit together in a full analysis pipeline:
+
+```{r full-workflow, eval=TRUE}
+library(tidyverse)
+
+# --- STEP 1: Set your working directory ---
+# setwd("path/to/project")
+
+# --- STEP 2: Import data ---
+# From CSV (adjust path as needed)
+# data <- read_csv("gene_expression.csv")
+
+# From URL (bioinformatics example — works as-is)
+url  <- "https://bioconnector.github.io/workshops/data/brauer2007_messy.csv"
+data <- read.csv(url)
+
+# --- STEP 3: First inspection ---
+dim(data)
+head(data, 5)
+str(data)
+colSums(is.na(data))
+
+# --- STEP 4: Fix types if needed ---
+# data$sample <- as.factor(data$sample)
+
+# --- STEP 5: Quick summary ---
+summary(data[, 1:5])
+
+# --- STEP 6: Export cleaned data ---
+# write_csv(data, "clean_data.csv")
+# saveRDS(data, "clean_data.rds")
+```
+
+---
+
+# Advanced: Importing from a Database or API
+
+## Importing via a Loop (Multiple Files)
+
+A common research pattern: import one file per year, bind everything into a single data frame:
+
+```{r loop-import}
+library(tidyverse)
+
+# Example: import 10 years of annual weather data
+years <- 2014:2023
+
+all_years <- map_dfr(years, function(yr) {
+  filename <- paste0("Kirkuk_Weather_", yr, ".csv")
+  df       <- read.csv(filename)
+  df$year  <- yr    # add a year identifier column
+  return(df)
+})
+
+dim(all_years)
+```
+
+The same pattern using a `for` loop:
+
+```{r loop-for}
+results <- list()
+
+for (yr in 2014:2023) {
+  filename      <- paste0("Kirkuk_Weather_", yr, ".csv")
+  results[[yr]] <- read.csv(filename)
+}
+
+all_data <- do.call(rbind, results)
+```
+
+## Working with Weather Data APIs (`worldmet`)
+
+```{r worldmet}
+# install.packages("worldmet")
+library(worldmet)
+library(dplyr)
+library(lubridate)
+
+# A function that imports NOAA weather data for one year, computes annual averages,
+# and writes the result to a CSV file
+import_annual_averages <- function(year) {
+  # Import from NOAA (station code for Kirkuk, Iraq)
+  raw <- importNOAA(code = "406210-99999", year = year)
+
+  # Add year column
+  raw$date <- as.Date(raw$date)
+  raw$year <- year(raw$date)
+
+  # Compute annual mean for all numeric columns
+  annual <- raw %>%
+    select_if(is.numeric) %>%
+    group_by(year) %>%
+    summarise(across(everything(), mean, na.rm = TRUE))
+
+  # Export to CSV
+  write.csv(annual,
+            paste0("Kirkuk_annual_avg_", year, ".csv"),
+            row.names = FALSE)
+  return(annual)
+}
+
+# Apply to a range of years
+for (yr in 2014:2023) {
+  import_annual_averages(yr)
+}
+```
+
+---
+
+# Troubleshooting Common Import Problems
+
+| Problem | Likely cause | Solution |
+|---|---|---|
+| `cannot open file`: No such file | Wrong path / working directory | Check `getwd()`, use full path, or `file.choose()` |
+| Extra column of row numbers | `row.names` present in CSV | `read.csv(file, row.names = 1)` or `write.csv(..., row.names = FALSE)` |
+| All columns read as character | Missing `header=TRUE` or wrong separator | Specify `header=TRUE, sep=","` |
+| Numeric column contains `NA` | Non-numeric values hidden in data | Check `unique()` and fix source file |
+| Date column read as character | No date format specified | `as.Date(col, format="%Y-%m-%d")` |
+| `"object not found"` after `load()` | Loaded but name is different | Check `ls()` after `load()` |
+| File reads fine but tibble columns look wrong | `col_types` mismatch | Use `spec(data)` to review readr's guess |
+| Encoding errors (`<U+FEFF>` etc.) | File encoding is not UTF-8 | Add `fileEncoding = "UTF-8-BOM"` or `"latin1"` |
+
+---
+
+# Quick Reference Card
+
+## Import
+
+```r
+# Base R
+read.csv("file.csv")                    # CSV
+read.csv2("file.csv")                   # Semicolon CSV
+read.table("file.txt", sep="\t")        # Tab-separated
+read.delim("file.tsv")                  # Tab-separated shortcut
+read.csv("https://url/file.csv")        # From URL
+
+# readr (tidyverse — returns tibble)
+read_csv("file.csv")
+read_csv2("file.csv")
+read_tsv("file.tsv")
+read_delim("file.txt", delim="|")
+
+# data.table (fastest)
+fread("file.csv")
+
+# Excel
+readxl::read_excel("file.xlsx", sheet=1)
+
+# SPSS / Stata / SAS
+haven::read_sav("file.sav")
+haven::read_dta("file.dta")
+haven::read_sas("file.sas7bdat")
+
+# Universal
+rio::import("file.csv")
+rio::import("file.xlsx")
+```
+
+## Export
+
+```r
+# Base R
+write.csv(df, "file.csv", row.names=FALSE)
+write.csv2(df, "file.csv", row.names=FALSE)
+write.table(df, "file.txt", sep="\t", row.names=FALSE)
+
+# readr
+write_csv(df, "file.csv")
+write_tsv(df, "file.tsv")
+
+# data.table
+fwrite(df, "file.csv")
+
+# R binary
+saveRDS(df, "file.rds")          # single object
+readRDS("file.rds")              # reload
+save(a, b, c, file="objs.RData") # multiple objects
+load("objs.RData")               # reload all
+
+# Universal
+rio::export(df, "file.xlsx")
+```
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Use `getwd()` to display your current working directory. Create a data frame with 5 rows and 3 columns (name, age, score). Export it as a CSV with `write.csv()` (no row names). Then import it back with `read.csv()` and verify the dimensions match.
+
+**Exercise 2.** Download the following CSV directly from a URL into R:  
+`https://raw.githubusercontent.com/datasets/iris/master/data/iris.csv`  
+Inspect the result using `str()`, `dim()`, `head()`, and `colSums(is.na(.))`.
+
+**Exercise 3.** Import the same file using `readr::read_csv()`. Compare the output with the `read.csv()` result — what is the class of each result? What differences do you notice in how the data is displayed?
+
+**Exercise 4.** Take any data frame from Exercise 1 or 2 and save it in three different formats: `.csv`, `.rds`, and `.RData`. Then reload each format and verify the content is identical using `identical()`.
+
+**Exercise 5.** Write a function `safe_import(filepath)` that: (1) checks whether the file exists with `file.exists()`; (2) imports it with `read.csv()` if it does; (3) returns a clear error message if it does not. Test it with both a valid and an invalid file path.
+
+**Exercise 6.** Write a loop that generates 3 small data frames (one per year: 2022, 2023, 2024), saves each as a separate CSV (`data_2022.csv`, etc.), then reads all three back and combines them into a single data frame using `do.call(rbind, ...)` or `purrr::map_dfr()`.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Importing and Exporting Data in R*

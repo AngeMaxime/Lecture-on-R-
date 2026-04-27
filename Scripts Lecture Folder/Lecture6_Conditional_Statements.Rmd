@@ -1,0 +1,870 @@
+---
+title: "Conditional Statements and Control Flow in R"
+subtitle: "if/else, ifelse(), case_when(), while loops, for loops, and functions"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##"
+)
+```
+
+---
+
+# Introduction
+
+**Control flow** is the order in which a program executes its instructions. By default, R runs code line by line from top to bottom. Conditional statements and loops let you change that order — executing certain blocks only when needed, or repeating them automatically.
+
+In this lecture we cover:
+
+- **Comparison and logical operators** — the building blocks of all conditions
+- **`if` / `else if` / `else`** — run code based on a condition
+- **Nested `if`** — conditions inside conditions
+- **`ifelse()`** — vectorized conditional for data manipulation
+- **`case_when()`** — the clean, scalable alternative to nested `ifelse()`
+- **`switch()`** — select from multiple named cases
+- **`while` loops** — repeat while a condition is true
+- **`for` loops** — iterate over a sequence or collection
+- **`break` and `next`** — control loop execution
+- **Nested loops** — loops inside loops
+- **Functions** — reusable blocks of code
+
+---
+
+# Comparison and Logical Operators
+
+Every conditional statement relies on a **Boolean** result: either `TRUE` or `FALSE`. Comparison operators produce these results.
+
+## Comparison Operators
+
+| Operator | Meaning | Example | Result |
+|---|---|---|---|
+| `==` | Equal to | `5 == 5` | `TRUE` |
+| `!=` | Not equal to | `5 != 3` | `TRUE` |
+| `>` | Greater than | `10 > 3` | `TRUE` |
+| `<` | Less than | `2 < 1` | `FALSE` |
+| `>=` | Greater than or equal to | `5 >= 5` | `TRUE` |
+| `<=` | Less than or equal to | `4 <= 3` | `FALSE` |
+
+```{r comparison-operators}
+x <- 10
+y <- 20
+
+x == y    # Is x equal to y?
+x != y    # Is x different from y?
+x > y     # Is x greater than y?
+x < y     # Is x less than y?
+x >= 10   # Is x greater than or equal to 10?
+y <= 20   # Is y less than or equal to 20?
+```
+
+> ⚠️ **Common mistake:** Do not confuse `=` (assignment) with `==` (equality test). Always use `==` when comparing values inside conditions.
+
+## Logical Operators
+
+Logical operators combine multiple conditions.
+
+| Operator | Meaning | Example |
+|---|---|---|
+| `&` | AND (element-wise) | `x > 5 & x < 20` |
+| `\|` | OR (element-wise) | `x < 5 \| x > 8` |
+| `!` | NOT (negation) | `!(x == 10)` |
+| `&&` | AND (scalar only) | Use inside `if()` |
+| `\|\|` | OR (scalar only) | Use inside `if()` |
+
+```{r logical-operators}
+a <- 200
+b <- 33
+c <- 500
+
+# AND: both conditions must be TRUE
+a > b & c > a
+
+# OR: at least one condition must be TRUE
+a > b | a > c
+
+# NOT: inverts the result
+!(a == b)
+```
+
+> 💡 Use `&` and `|` when working with **vectors** (they test element by element). Use `&&` and `||` only inside `if()` statements with **single scalar values** — they are short-circuit evaluated (stop as soon as the result is known).
+
+---
+
+# The `if` Statement
+
+An `if` statement executes a block of code **only when its condition is `TRUE`**.
+
+```r
+if (condition) {
+  # code to run if condition is TRUE
+}
+```
+
+```{r if-basic}
+b <- 200
+a <- 33
+
+if (b > a) {
+  print("b is greater than a")
+}
+```
+
+R uses **curly braces `{ }`** to define the block of code belonging to each condition. Everything inside the braces is executed together.
+
+---
+
+# `if` / `else if` / `else`
+
+The full conditional structure handles multiple possible outcomes:
+
+```r
+if (condition1) {
+  # runs if condition1 is TRUE
+} else if (condition2) {
+  # runs if condition1 was FALSE and condition2 is TRUE
+} else {
+  # runs if ALL previous conditions were FALSE
+}
+```
+
+R evaluates conditions **from top to bottom** and executes the **first** block whose condition is `TRUE`. Once a match is found, all remaining branches are skipped.
+
+```{r if-else-if-else}
+a <- 200
+b <- 33
+
+if (b > a) {
+  print("b is greater than a")
+} else if (a == b) {
+  print("a and b are equal")
+} else {
+  print("a is greater than b")
+}
+```
+
+## Full Example — Age Classification
+
+```{r age-classification}
+age <- 25
+
+if (age < 0) {
+  print("Not yet born!")
+} else if (age < 18) {
+  print("Minor")
+} else if (age < 65) {
+  print("Adult")
+} else if (age <= 120) {
+  print("Senior")
+} else {
+  print("Immortal!")
+}
+```
+
+## Combining Conditions with `&` and `|`
+
+```{r combined-conditions}
+x <- 100
+y <- 100
+
+# Both conditions in one if
+if (x > 0 & y > 0) {
+  print("Both x and y are positive")
+}
+
+# Using OR
+score <- 85
+if (score >= 90 | score < 0) {
+  print("Score is either excellent or invalid")
+} else {
+  print("Score is in the normal range")
+}
+```
+
+---
+
+# Nested `if` Statements
+
+You can place `if` statements **inside** other `if` statements. This is called a **nested if** and is used when the inner decision only makes sense if the outer condition is already true.
+
+```{r nested-if}
+num <- 50
+
+if (num > 20) {
+  print("Greater than 20")
+  if (num > 30) {
+    print("Also greater than 30")
+  } else {
+    print("But NOT greater than 30")
+  }
+} else {
+  print("Not above 20")
+}
+```
+
+```{r nested-if-2}
+x <- 41
+
+if (x > 10) {
+  print("Above 10")
+  if (x > 20) {
+    print("And also above 20!")
+  } else {
+    print("But not above 20.")
+  }
+} else {
+  print("Below or equal to 10")
+}
+```
+
+> ⚠️ **Nesting caution:** More than 2–3 levels of nested `if` statements become very hard to read and debug. When you find yourself writing deeply nested conditions, consider using `ifelse()` or `case_when()` instead (see below).
+
+---
+
+# Vectorized Conditions: `ifelse()`
+
+The standard `if / else` structure works on a **single value**. When you need to apply a condition to every element of a vector or data frame column, use `ifelse()`.
+
+```r
+ifelse(condition, value_if_TRUE, value_if_FALSE)
+```
+
+```{r ifelse-basic}
+ages <- c(12, 25, 17, 34, 8, 19)
+
+# Classify each age as "Adult" or "Minor"
+ifelse(ages >= 18, "Adult", "Minor")
+```
+
+```{r ifelse-vector}
+scores <- c(45, 82, 67, 91, 55, 73)
+
+# Pass/Fail
+ifelse(scores >= 60, "Pass", "Fail")
+```
+
+## `ifelse()` with Data Frames
+
+`ifelse()` integrates naturally with `dplyr::mutate()`:
+
+```{r ifelse-mutate, message=FALSE}
+library(tidyverse)
+
+starwars %>%
+  select(name, height) %>%
+  mutate(size = ifelse(height > 180, "Tall", "Short")) %>%
+  drop_na() %>%
+  head(8)
+```
+
+## Handling `NA` values with `ifelse()`
+
+```{r ifelse-na}
+x <- c(5, NA, 15, NA, 25)
+
+# Replace NA with 0, keep others unchanged
+ifelse(is.na(x), 0, x)
+```
+
+> ⚠️ `ifelse()` is powerful but **nested `ifelse()` calls become unreadable** very quickly. For more than two outcomes, use `case_when()`.
+
+---
+
+# `case_when()` — The Scalable Alternative
+
+`case_when()` from `dplyr` is the cleanest way to handle **multiple conditions**. Each condition is written as:
+
+```r
+condition ~ result
+```
+
+Conditions are evaluated top to bottom. The first `TRUE` match wins. `TRUE ~ ...` at the end acts as the default (equivalent to the final `else`).
+
+```{r case-when-basic}
+ages <- c(-2, 8, 16, 25, 67, 150)
+
+case_when(
+  ages < 0   ~ "Not yet born",
+  ages < 18  ~ "Minor",
+  ages < 65  ~ "Adult",
+  ages <= 120 ~ "Senior",
+  TRUE        ~ "Immortal"
+)
+```
+
+## `case_when()` vs Nested `ifelse()`
+
+```{r case-when-comparison}
+scores <- c(95, 82, 67, 54, 40)
+
+# Nested ifelse — hard to read
+ifelse(scores >= 90, "A",
+  ifelse(scores >= 80, "B",
+    ifelse(scores >= 70, "C",
+      ifelse(scores >= 60, "D", "F"))))
+
+# case_when — clean and readable
+case_when(
+  scores >= 90 ~ "A",
+  scores >= 80 ~ "B",
+  scores >= 70 ~ "C",
+  scores >= 60 ~ "D",
+  TRUE         ~ "F"
+)
+```
+
+## `case_when()` in a Data Frame
+
+```{r case-when-mutate}
+starwars %>%
+  select(name, height) %>%
+  drop_na() %>%
+  mutate(category = case_when(
+    height > 200 ~ "Very tall",
+    height > 180 ~ "Tall",
+    height > 150 ~ "Average",
+    TRUE         ~ "Short"
+  )) %>%
+  head(10)
+```
+
+## `case_when()` with Missing Value Logic
+
+`case_when()` is especially powerful when handling missing values that have different meanings depending on context:
+
+```{r case-when-na}
+driving <- c(0.02, NA, 0.01, NA, 0.03)
+other   <- c(0.01, 0.02, NA, NA, 0.01)
+
+case_when(
+  is.na(driving) & is.na(other)  ~ 0,
+  is.na(driving)                 ~ other,
+  is.na(other)                   ~ driving,
+  TRUE                           ~ driving + other
+)
+```
+
+---
+
+# `switch()` — Selecting from Named Cases
+
+`switch()` is ideal when you have a variable that can take several specific string values and you want to execute a different action for each.
+
+```{r switch-basic}
+day_type <- function(day) {
+  switch(day,
+    "Monday"    = ,
+    "Tuesday"   = ,
+    "Wednesday" = ,
+    "Thursday"  = ,
+    "Friday"    = "Weekday",
+    "Saturday"  = ,
+    "Sunday"    = "Weekend",
+    "Unknown day"   # default
+  )
+}
+
+day_type("Monday")
+day_type("Saturday")
+day_type("Wednesday")
+day_type("Holiday")
+```
+
+> 💡 Leaving a case value empty (e.g., `"Monday" = ,`) means it **falls through** to the next non-empty case — useful for grouping multiple values to the same result.
+
+---
+
+# The `while` Loop
+
+A `while` loop repeats a block of code **as long as its condition remains `TRUE`**. It checks the condition **before** each iteration.
+
+```r
+while (condition) {
+  # code to repeat
+  # must include something that will eventually make condition FALSE
+}
+```
+
+> ⚠️ **Always increment your counter!** If the condition never becomes `FALSE`, the loop runs forever (infinite loop). Always make sure something inside the loop changes the variable being tested.
+
+```{r while-basic}
+i <- 1
+
+while (i < 6) {
+  print(i)
+  i <- i + 1   # increment — essential to avoid infinite loop
+}
+```
+
+## Practical `while` Example — Score Countdown
+
+```{r while-score}
+score <- 100
+
+while (score > 0) {
+  print(paste("You are still alive. Score:", score))
+  score <- score - 10
+}
+```
+
+## `while` with `if` inside — Adding Milestones
+
+```{r while-milestone}
+score <- 100
+
+while (score > 0) {
+  if (score == 50) {
+    print(">>> You reached the halfway point!")
+  }
+  print(paste("Score:", score))
+  score <- score - 10
+}
+```
+
+## `break` — Stop the Loop Early
+
+`break` immediately exits the loop, regardless of the condition.
+
+```{r while-break}
+x <- 1
+
+while (x <= 10) {
+  print(x)
+  x <- x + 1
+  if (x == 5) {
+    break   # stop as soon as x reaches 5
+  }
+}
+```
+
+## `next` — Skip One Iteration
+
+`next` skips the rest of the current iteration and jumps straight to the next one.
+
+```{r while-next}
+i <- 0
+
+while (i < 6) {
+  i <- i + 1
+  if (i == 3) {
+    next   # skip printing when i equals 3
+  }
+  print(i)
+}
+```
+
+## `while` + `if/else` — Yahtzee Example
+
+```{r while-yahtzee}
+dice <- 1
+
+while (dice <= 6) {
+  if (dice < 6) {
+    print(paste("Dice:", dice, "— No Yahtzee"))
+  } else {
+    print(paste("Dice:", dice, "— YAHTZEE!"))
+  }
+  dice <- dice + 1
+}
+```
+
+---
+
+# The `for` Loop
+
+A `for` loop iterates over every element of a sequence — a numeric range, a vector, a list, or any iterable object. Unlike `while`, it does not need an explicit counter.
+
+```r
+for (variable in sequence) {
+  # code executed once per element
+}
+```
+
+## Iterating over a Numeric Range
+
+```{r for-range}
+for (i in 1:10) {
+  print(i)
+}
+```
+
+## Iterating over a Vector
+
+```{r for-vector}
+fruits <- c("apple", "banana", "cherry", "mango")
+
+for (fruit in fruits) {
+  print(fruit)
+}
+```
+
+## Iterating over a List
+
+```{r for-list}
+info <- list("Alice", 25, TRUE)
+
+for (item in info) {
+  print(item)
+}
+```
+
+## Using `length()` to Loop over a Data Structure
+
+```{r for-length}
+numbers <- c(10, 20, 30, 40, 50)
+
+for (i in 1:length(numbers)) {
+  print(paste("Position", i, "— Value:", numbers[i]))
+}
+```
+
+## `for` with `if` inside — Filtering During Iteration
+
+```{r for-if}
+vec <- islands   # built-in R dataset: land masses and their areas
+
+for (i in 1:length(vec)) {
+  if (vec[i] > 10000) {
+    print(paste(names(vec[i]), "is a very large land mass:", vec[i], "thousand sq mi"))
+  }
+}
+```
+
+## `break` in a `for` Loop
+
+```{r for-break}
+fruits <- list("apple", "banana", "cherry")
+
+for (x in fruits) {
+  if (x == "cherry") {
+    break   # stop when we reach cherry
+  }
+  print(x)
+}
+```
+
+## `next` in a `for` Loop
+
+```{r for-next}
+numbers <- c(10, 20, 30, 40, 50)
+
+for (num in numbers) {
+  if (num == 30) {
+    next   # skip 30
+  }
+  print(num)
+}
+```
+
+## `for` + `if/else` — Yahtzee Revisited
+
+```{r for-yahtzee}
+dice <- 1:6
+
+for (x in dice) {
+  if (x == 6) {
+    print(paste("Dice:", x, "— YAHTZEE!"))
+  } else {
+    print(paste("Dice:", x, "— Not Yahtzee"))
+  }
+}
+```
+
+## `paste()` — Combining Text and Variables
+
+Inside loops, `paste()` (or `paste0()`) lets you embed variable values into a printed message:
+
+```{r paste-demo}
+name  <- "Africa"
+area  <- 11506
+
+paste("The region", name, "has an area of", area, "thousand sq mi")
+paste0("Region: ", name, " (", area, ")")
+```
+
+---
+
+# Nested Loops
+
+A **nested loop** is a loop inside another loop. The inner loop completes all its iterations for **each single iteration** of the outer loop.
+
+```{r nested-loop}
+adj    <- list("red", "big", "tasty")
+fruits <- list("apple", "banana", "cherry")
+
+for (x in adj) {
+  for (y in fruits) {
+    print(paste(x, y))
+  }
+}
+```
+
+## Nested Loop with a Condition
+
+```{r nested-loop-condition}
+for (i in 1:4) {
+  for (j in 1:4) {
+    if (i == j) {
+      print(paste("Diagonal element:", i, ",", j))
+    }
+  }
+}
+```
+
+> ⚠️ Nested loops can become slow with large data. For most data analysis tasks, vectorized operations (`ifelse()`, `case_when()`, `apply()`, or `purrr::map()`) are faster and more readable. Use nested loops when the logic genuinely requires sequential iteration.
+
+---
+
+# `break` and `next` — Summary
+
+| Keyword | Works in | Effect |
+|---|---|---|
+| `break` | `while`, `for`, `repeat` | Immediately **exits** the loop entirely |
+| `next` | `while`, `for` | **Skips** the current iteration and moves to the next |
+
+```{r break-next-summary}
+# break: exits at first multiple of 7
+for (i in 1:50) {
+  if (i %% 7 == 0) {
+    print(paste("First multiple of 7:", i))
+    break
+  }
+}
+
+# next: prints only even numbers
+for (i in 1:10) {
+  if (i %% 2 != 0) next   # skip odd numbers
+  print(i)
+}
+```
+
+---
+
+# Functions
+
+Functions let you **package reusable logic** into a named unit. Once defined, you can call the function as many times as needed without duplicating code.
+
+```r
+my_function <- function(argument1, argument2) {
+  # body: code that runs each time the function is called
+  result <- argument1 + argument2
+  return(result)   # return the output
+}
+```
+
+## Defining and Calling a Function
+
+```{r function-basic}
+# Define
+greet <- function(name) {
+  print(paste("Hello,", name, "!"))
+}
+
+# Call
+greet("Alice")
+greet("Bob")
+```
+
+## Function with Multiple Arguments
+
+```{r function-multiple-args}
+power_mean <- function(x, power = 2) {
+  mean(x, na.rm = TRUE) ^ power
+}
+
+power_mean(c(1:20, NA))          # uses default power = 2
+power_mean(c(1:20, NA), power = 3)  # override default
+```
+
+> 💡 **Default arguments** let you define a sensible fallback value. Callers only need to supply the argument if they want a different value.
+
+## Function with `if/else` inside
+
+```{r function-if}
+classify_score <- function(score) {
+  if (score < 0 | score > 100) {
+    return("Invalid score")
+  } else if (score >= 90) {
+    return("A")
+  } else if (score >= 80) {
+    return("B")
+  } else if (score >= 70) {
+    return("C")
+  } else if (score >= 60) {
+    return("D")
+  } else {
+    return("F")
+  }
+}
+
+classify_score(95)
+classify_score(73)
+classify_score(42)
+classify_score(-5)
+```
+
+## Function with a `for` Loop inside
+
+```{r function-for}
+print_multiples <- function(n, up_to = 10) {
+  for (i in 1:up_to) {
+    print(paste(n, "x", i, "=", n * i))
+  }
+}
+
+print_multiples(3)
+print_multiples(7, up_to = 5)
+```
+
+---
+
+# Applying Functions over Vectors: `lapply()` and `sapply()`
+
+For loops are one way to apply a function to each column or element. `lapply()` and `sapply()` are more concise alternatives.
+
+```{r apply-functions}
+# lapply: returns a list
+lapply(airquality, mean, na.rm = TRUE)
+
+# sapply: returns a named vector (simpler output)
+sapply(airquality, mean, na.rm = TRUE)
+
+# They are equivalent to this for loop:
+for (i in 1:ncol(airquality)) {
+  cat(names(airquality)[i], ":", mean(airquality[, i], na.rm = TRUE), "\n")
+}
+```
+
+---
+
+# Control Flow Decision Guide
+
+Use this guide to choose the right tool:
+
+| Situation | Best tool |
+|---|---|
+| Execute code only if one condition is met | `if` |
+| Choose between 2 outcomes | `if / else` |
+| Choose between 3+ outcomes | `if / else if / else` |
+| Check a condition only if an outer condition was met | Nested `if` |
+| Apply a condition to each element of a vector | `ifelse()` |
+| Apply 3+ conditions to a vector or column | `case_when()` |
+| Switch between named string cases | `switch()` |
+| Repeat while a condition holds (unknown iterations) | `while` |
+| Iterate over a fixed sequence or collection | `for` |
+| Apply a function to every element of a list/vector | `lapply()` / `sapply()` |
+| Exit a loop early | `break` |
+| Skip one iteration | `next` |
+
+---
+
+# Complete Examples
+
+## Example 1 — BMI Classifier
+
+```{r example-bmi}
+classify_bmi <- function(weight_kg, height_cm) {
+  bmi <- weight_kg / (height_cm / 100)^2
+  
+  category <- case_when(
+    bmi < 18.5              ~ "Underweight",
+    bmi < 25.0              ~ "Normal weight",
+    bmi < 30.0              ~ "Overweight",
+    TRUE                    ~ "Obese"
+  )
+  
+  paste0("BMI = ", round(bmi, 1), " — ", category)
+}
+
+classify_bmi(70, 175)
+classify_bmi(50, 170)
+classify_bmi(100, 165)
+```
+
+## Example 2 — FizzBuzz with a `for` Loop
+
+```{r example-fizzbuzz}
+for (i in 1:20) {
+  if (i %% 15 == 0) {
+    print("FizzBuzz")
+  } else if (i %% 3 == 0) {
+    print("Fizz")
+  } else if (i %% 5 == 0) {
+    print("Buzz")
+  } else {
+    print(i)
+  }
+}
+```
+
+## Example 3 — Countdown with `while`
+
+```{r example-countdown}
+countdown <- function(from) {
+  n <- from
+  while (n > 0) {
+    print(paste(n, "..."))
+    n <- n - 1
+  }
+  print("Lift off!")
+}
+
+countdown(5)
+```
+
+## Example 4 — Vectorized `case_when()` on a Data Frame
+
+```{r example-starwars}
+library(tidyverse)
+
+starwars %>%
+  select(name, height, mass) %>%
+  drop_na() %>%
+  mutate(
+    bmi      = round(mass / (height / 100)^2, 1),
+    category = case_when(
+      bmi < 18.5 ~ "Underweight",
+      bmi < 25.0 ~ "Normal",
+      bmi < 30.0 ~ "Overweight",
+      TRUE       ~ "Obese"
+    )
+  ) %>%
+  count(category, sort = TRUE)
+```
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Write an `if / else if / else` block that takes a temperature (in °C) and prints: "Freezing" (< 0), "Cold" (0–15), "Warm" (16–25), or "Hot" (> 25). Test it with at least four values.
+
+**Exercise 2.** Use `ifelse()` to classify a vector of 10 random integers between 1 and 100 as "Even" or "Odd". Then use `case_when()` to classify them as "Low" (1–33), "Medium" (34–66), or "High" (67–100).
+
+**Exercise 3.** Write a `for` loop that iterates over the built-in `month.name` vector and prints each month name along with whether it has 28, 30, or 31 days. Use an `if / else if / else` inside the loop.
+
+**Exercise 4.** Write a `while` loop that starts at 1 and prints the cumulative sum of integers. Stop the loop when the cumulative sum exceeds 100. Print which number caused it to stop.
+
+**Exercise 5.** Write a function `grade_report(name, scores)` that takes a student's name and a numeric vector of scores, and prints: the student's name, their average score, and their letter grade (using `case_when()`). Call the function for at least three students.
+
+**Exercise 6.** Using the `starwars` dataset and `case_when()`, create a new column `weight_class` based on the `mass` variable: "Light" (< 60 kg), "Medium" (60–100 kg), "Heavy" (> 100 kg), and "Unknown" (NA). Count how many characters fall into each class.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Conditional Statements and Control Flow in R*

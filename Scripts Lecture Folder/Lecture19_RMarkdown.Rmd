@@ -1,0 +1,515 @@
+---
+title: "Lecture 11: Mastering R Markdown — From Basics to Publication"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+---
+
+# Learning Objectives
+
+By the end of this lecture, you will be able to:
+
+- Explain what R Markdown is and why it is used for reproducible research
+- Understand the **three layers** of an R Markdown document: YAML, Markdown text, and R code chunks
+- Configure a YAML header for HTML, PDF, and Word outputs
+- Control chunk behaviour with key options: `echo`, `eval`, `include`, `message`, `warning`
+- Use inline R code to embed live results in narrative text
+- Structure documents with headings, lists, bold/italic text, tables, links, and images
+- Apply **tabsets** for interactive section navigation
+- Use the **visual editor** and publish to **RPubs**
+- Understand and apply advanced YAML options: `toc_float`, `code_folding`, `theme`, `highlight`, `number_sections`
+
+---
+
+# What is R Markdown?
+
+R Markdown is a file format (`.Rmd`) that **combines R code, its output, and narrative text** in a single document. When you *knit* the document, R Markdown runs all the code, collects the results, and weaves everything into a polished output file.
+
+## Why R Markdown?
+
+| Benefit | Description |
+|---|---|
+| **Reproducibility** | Anyone with the `.Rmd` file can regenerate the exact same results |
+| **Multiple output formats** | One source file → HTML, PDF, Word, slides |
+| **Automation** | Reports update automatically when data changes |
+| **Transparency** | Code and results live together — no copy-paste errors |
+| **Portfolio building** | Publish to RPubs or GitHub to showcase your work |
+
+## Output formats at a glance
+
+| Format | Requirement | Use case |
+|---|---|---|
+| `html_document` | None — always available | Web reports, interactive documents |
+| `pdf_document` | LaTeX installed (MiKTeX / TinyTeX) | Academic papers, formal reports |
+| `word_document` | Microsoft Word or LibreOffice | Collaborating with non-R users |
+| `beamer_presentation` | LaTeX | PDF slide deck |
+| `ioslides_presentation` | None | HTML slide deck |
+
+> **Getting started with PDF:** Install TinyTeX directly from R:  
+> `install.packages("tinytex"); tinytex::install_tinytex()`
+
+---
+
+# The Three Layers of an R Markdown Document
+
+Every `.Rmd` file has exactly three layers:
+
+```
+┌─────────────────────────────────────────────┐
+│  1. YAML HEADER (metadata & output options) │  ← between --- delimiters
+├─────────────────────────────────────────────┤
+│  2. MARKDOWN TEXT (narrative, prose)        │  ← plain text + formatting
+├─────────────────────────────────────────────┤
+│  3. R CODE CHUNKS (executable R code)       │  ← between ```{r} and ```
+└─────────────────────────────────────────────┘
+```
+
+---
+
+# Layer 1 — The YAML Header
+
+The YAML header sits at the very top of the `.Rmd` file, surrounded by triple dashes (`---`). It controls the document's **metadata** (title, author, date) and **rendering options** (output format, themes, table of contents).
+
+## Minimal YAML
+
+```yaml
+---
+title: "My Report"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```
+
+> `"\`r Sys.Date()\`"` is inline R code inside YAML — the date updates automatically every time you knit.
+
+## Full-featured HTML YAML
+
+```yaml
+---
+title: "My Report"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true               # Include a table of contents
+    toc_float: true         # Make the TOC float on the left as you scroll
+    toc_depth: 3            # Include headings up to level 3
+    number_sections: true   # Auto-number all sections
+    fig_caption: true       # Show captions below figures
+    theme: flatly           # Bootstrap CSS theme
+    highlight: tango        # Syntax highlighting style for code
+    code_folding: hide      # Hide code blocks by default (reader can expand)
+editor_options:
+  markdown:
+    wrap: 72                # Wrap text at 72 characters per line
+---
+```
+
+## Generating multiple output formats from one file
+
+```yaml
+---
+title: "My Report"
+author: "Your Name"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+  pdf_document:
+    toc: true
+  word_document:
+    toc: true
+---
+```
+
+> **Note:** When multiple output formats are listed, clicking *Knit* produces the **first** format listed. Use `rmarkdown::render("file.Rmd", output_format = "all")` to render all formats at once.
+
+## Complete YAML option reference
+
+### `theme` — Bootstrap CSS themes for HTML
+
+Available themes:
+
+| Theme | Style |
+|---|---|
+| `default` | Standard, clean |
+| `cerulean` | Blue accent, modern |
+| `flatly` | Flat design, professional |
+| `cosmo` | Clean and minimal |
+| `journal` | Classic academic |
+| `readable` | Optimised for reading |
+| `spacelab` | Light grey, spacious |
+| `united` | Orange accent |
+| `darkly` | Dark background |
+| `lumen` | Soft pastel tones |
+
+### `highlight` — Syntax highlighting for code chunks
+
+| Style | Character |
+|---|---|
+| `default` | Standard |
+| `tango` | Warm earth tones |
+| `pygments` | Colourful, Python-inspired |
+| `kate` | Cool blue/green |
+| `monochrome` | Black and white |
+| `espresso` | Dark, elegant |
+| `zenburn` | Low-contrast, eye-friendly |
+| `haddock` | Modern, high contrast |
+| `textmate` | Bright, editor-like |
+
+### `code_folding`
+
+```yaml
+code_folding: hide    # Code hidden by default; reader clicks to expand
+code_folding: show    # Code visible by default; reader can collapse
+code_folding: none    # No toggle button — always use chunk-level echo
+```
+
+---
+
+# Layer 2 — Markdown Text
+
+## Headings
+
+```markdown
+# Heading Level 1
+## Heading Level 2
+### Heading Level 3
+#### Heading Level 4
+##### Heading Level 5
+###### Heading Level 6
+```
+
+## Text Formatting
+
+```markdown
+**Bold text**
+*Italic text*
+***Bold and italic***
+~~Strikethrough~~
+`inline code`
+```
+
+**Bold text** | *Italic text* | ***Bold and italic*** | ~~Strikethrough~~ | `inline code`
+
+## Lists
+
+Unordered list (use `-`, `*`, or `+`):
+
+```markdown
+- First item
+- Second item
+  - Nested item
+  - Another nested item
+- Third item
+```
+
+Ordered list:
+
+```markdown
+1. First step
+2. Second step
+3. Third step
+```
+
+## Links and Images
+
+```markdown
+[Link text](https://www.example.com)
+
+![Image caption](path/to/image.png)
+```
+
+## Tables
+
+```markdown
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Cell 1   | Cell 2   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+```
+
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| Cell 1   | Cell 2   | Cell 3   |
+| Cell 4   | Cell 5   | Cell 6   |
+
+## Block quotes
+
+```markdown
+> This is a block quote.
+> It can span multiple lines.
+```
+
+> This is a block quote.  
+> It can span multiple lines.
+
+## Horizontal rule
+
+```markdown
+---
+```
+
+---
+
+## Tabsets `{.tabset}`
+
+Tabsets are an HTML feature that turns sub-headings into clickable tabs — very useful for organising related plots or tables without cluttering the page.
+
+To create a tabset, add `{.tabset}` to the **parent heading**:
+
+````markdown
+## Results {.tabset}
+
+### Plot
+```{r}
+plot(iris$Sepal.Length)
+```
+
+### Table
+```{r}
+head(iris)
+```
+````
+
+## Results {.tabset}
+
+### Plot
+
+```{r tabset-plot}
+plot(iris$Sepal.Length, col = "steelblue", pch = 16,
+     main = "Iris Sepal Length", ylab = "cm")
+```
+
+### Table
+
+```{r tabset-table}
+head(iris, 10)
+```
+
+### Summary
+
+```{r tabset-summary}
+summary(iris)
+```
+
+---
+
+# Layer 3 — R Code Chunks
+
+A code chunk is delimited by three backticks and `{r}`:
+
+````markdown
+```{r chunk-name, option1 = value1, option2 = value2}
+# Your R code here
+```
+````
+
+## Key chunk options
+
+| Option | Values | Effect |
+|---|---|---|
+| `echo` | `TRUE` / `FALSE` | Show or hide the code in the output |
+| `eval` | `TRUE` / `FALSE` | Run or skip the code |
+| `include` | `TRUE` / `FALSE` | Run code but show/hide both code AND output |
+| `message` | `TRUE` / `FALSE` | Show or hide package loading messages |
+| `warning` | `TRUE` / `FALSE` | Show or hide warning messages |
+| `fig.width` | numeric | Figure width in inches |
+| `fig.height` | numeric | Figure height in inches |
+| `fig.cap` | `"string"` | Caption below a figure |
+| `cache` | `TRUE` / `FALSE` | Cache results (avoids rerunning slow chunks) |
+
+## Demonstration of chunk options
+
+### `echo = TRUE` — Code and output both shown
+
+```{r echo-true, echo=TRUE}
+summary(rnorm(1000, mean = 0, sd = 1))
+```
+
+### `echo = FALSE` — Output shown, code hidden
+
+```{r echo-false, echo=FALSE}
+cat("This result appears, but you cannot see the code that produced it.\n")
+```
+
+### `eval = FALSE` — Code shown, NOT executed
+
+```{r eval-false, eval=FALSE}
+# This code will appear in the document but will NOT run
+summary(cars)
+```
+
+### `include = FALSE` — Code runs silently, nothing shown
+
+```{r include-false, include=FALSE}
+x <- 42   # This runs, x is now in memory, but nothing appears in the document
+```
+
+> The variable `x` created above equals `r x` — we can use it in inline code!
+
+### `message = FALSE` and `warning = FALSE`
+
+```{r message-warning, message=FALSE, warning=FALSE}
+library(tidyverse)   # Loading messages are suppressed
+```
+
+## Setting global chunk defaults
+
+In the `setup` chunk at the top of your document, use `knitr::opts_chunk$set()` to apply default options to **all chunks**:
+
+```{r global-opts, eval=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width  = 7,
+  fig.height = 5,
+  fig.align  = "center"
+)
+```
+
+> Individual chunk options **override** global defaults when they conflict.
+
+---
+
+# Inline R Code
+
+Inline R code embeds a live R expression directly into your narrative text. The syntax is: `` `r expression` ``
+
+**Example:**
+
+```markdown
+The `iris` dataset has `r nrow(iris)` rows and `r ncol(iris)` columns.
+The mean sepal length is `r round(mean(iris$Sepal.Length), 2)` cm.
+```
+
+**Renders as:**
+
+The `iris` dataset has `r nrow(iris)` rows and `r ncol(iris)` columns.  
+The mean sepal length is `r round(mean(iris$Sepal.Length), 2)` cm.
+
+> **Why this is powerful:** If your dataset changes, the numbers in the text update automatically when you re-knit — no manual copy-pasting required.
+
+---
+
+# The Visual Editor
+
+RStudio's **Visual Editor** provides a rich-text interface for writing R Markdown documents — similar to Word. To switch between Source and Visual mode, click the button in the top-left corner of the editor pane.
+
+**What the Visual Editor makes easier:**
+
+- Inserting links, images, and footnotes via point-and-click menus
+- Formatting text with toolbar buttons (bold, italic, headings)
+- Inserting tables with a graphical table editor
+- Real-time markdown rendering in the editor
+
+> **Recommended practice:** Use the Visual Editor for writing prose and inserting non-code elements. Switch to Source view when you need to fine-tune YAML, chunk options, or complex layouts.
+
+---
+
+# Publishing to RPubs
+
+**RPubs** (https://rpubs.com) is a free hosting service by RStudio for sharing HTML R Markdown documents publicly. It functions as an online portfolio for your R work.
+
+## How to publish
+
+1. Knit your document to HTML
+2. Click the **Publish** button (blue icon) in the Viewer pane
+3. Select **RPubs**
+4. Create a free account or log in
+5. Give your document a title and slug (URL)
+6. Click **Publish**
+
+Your document is now live at: `https://rpubs.com/yourusername/document-slug`
+
+## Why use RPubs?
+
+- **Portfolio:** Add your RPubs URL to your CV to demonstrate R skills
+- **Sharing:** Send a single link instead of a file attachment
+- **Reference:** Others can view and learn from your code
+- **Documentation:** Permanent record of your analyses
+
+> **Important:** RPubs only supports **HTML** output. You cannot publish PDF documents to RPubs.
+
+---
+
+# Complete Reproducible Example
+
+Here is a complete, minimal R Markdown workflow demonstrating all the concepts covered in this lecture:
+
+```{r full-example, fig.cap="Sepal Length distribution by Species — iris dataset"}
+library(ggplot2)
+
+ggplot(iris, aes(x = Species, y = Sepal.Length, fill = Species)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title    = "Sepal Length by Iris Species",
+    subtitle = paste("Based on", nrow(iris), "observations"),
+    x        = "Species",
+    y        = "Sepal Length (cm)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+The figure above shows the distribution of sepal length across the `r nlevels(iris$Species)` iris species. The overall mean sepal length is **`r round(mean(iris$Sepal.Length), 2)` cm**, with *`r iris$Species[which.max(iris$Sepal.Length)]`* having the single longest sepal at `r max(iris$Sepal.Length)` cm.
+
+---
+
+# Summary
+
+| Concept | Key point |
+|---|---|
+| YAML header | Controls metadata and output format options |
+| `toc` / `toc_float` | Table of contents (scrolling in HTML) |
+| `theme` / `highlight` | Visual style for HTML output |
+| `code_folding` | Let readers show/hide code |
+| `echo` / `eval` / `include` | Control visibility and execution of chunks |
+| `message` / `warning` | Suppress noisy output |
+| Inline code | `` `r expr` `` — live values in narrative text |
+| Tabsets | `## Section {.tabset}` — clickable tabs in HTML |
+| Visual Editor | Rich-text editing mode in RStudio |
+| RPubs | Free online hosting for HTML documents |
+
+---
+
+# Practice Exercises
+
+1. Create a new `.Rmd` file. Add a YAML header that outputs to HTML with a floating TOC, the `cerulean` theme, `tango` highlighting, and `code_folding: hide`. Knit it.
+
+2. Add three sections with headings. In each section, include one code chunk and one paragraph with at least one piece of inline R code.
+
+3. Create a tabset with three tabs: one showing a plot of `mtcars`, one showing `head(mtcars)`, and one showing `summary(mtcars)`.
+
+4. Write a chunk that loads `ggplot2` with `message = FALSE`. Then write a second chunk with `echo = FALSE` that plots a histogram of `mpg` from `mtcars`. Only the plot should appear.
+
+5. *Challenge:* Publish a complete 1-page analysis of the `airquality` dataset to RPubs. Include a table of contents, at least two plots, and a conclusion paragraph with three inline R values.
+
+---
+
+# References
+
+- Allaire, J. J., et al. (2023). *R Markdown: The Definitive Guide*. https://bookdown.org/yihui/rmarkdown/
+- Xie, Y., Allaire, J. J., & Grolemund, G. (2019). *R Markdown Cookbook*. https://bookdown.org/yihui/rmarkdown-cookbook/
+- RPubs: https://rpubs.com
+- TinyTeX: https://yihui.org/tinytex/

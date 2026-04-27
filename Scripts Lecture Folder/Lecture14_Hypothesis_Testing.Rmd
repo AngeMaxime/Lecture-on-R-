@@ -1,0 +1,773 @@
+---
+title: "Hypothesis Testing in R"
+subtitle: "A Comprehensive Lecture — From Theory to Practice"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  comment = "##"
+)
+```
+
+```{r packages}
+library(tidyverse)
+```
+
+---
+
+# Introduction to Inferential Statistics
+
+**Inferential statistics** allows us to draw conclusions about a population based on data collected from a sample. Rather than measuring every individual in a population (which is usually impossible), we study a representative sample and use statistical methods to generalize our findings.
+
+**Hypothesis testing** is the core tool of inferential statistics. It provides a rigorous, reproducible framework for making decisions from data — whether you are comparing drug treatments, studying disease risk factors, or analyzing gene expression levels.
+
+> ⚠️ **Key principle:** Statistical tests never *prove* anything. They assess how *compatible* our data are with a given assumption. We either **reject** or **fail to reject** a hypothesis — we never "accept" it.
+
+---
+
+# The Logic of Hypothesis Testing
+
+## The Two Hypotheses
+
+Every hypothesis test involves two competing statements:
+
+- **Null Hypothesis (H₀):** The "default" assumption — usually that there is **no effect, no difference, or no association**. It is what we try to disprove.
+
+- **Alternative Hypothesis (H₁ or Hₐ):** What we wish to demonstrate — that there **is** an effect, a difference, or an association.
+
+**Examples:**
+
+| Research Question | H₀ | H₁ |
+|---|---|---|
+| Does a new drug reduce blood pressure? | Mean BP before = Mean BP after | Mean BP after < Mean BP before |
+| Is gender associated with survival? | Gender and survival are independent | Gender and survival are associated |
+| Do three drug doses have the same effect? | All group means are equal | At least one mean differs |
+
+## The P-Value
+
+The **p-value** is the probability of obtaining results at least as extreme as those observed, *assuming H₀ is true*.
+
+- A **small p-value** (typically < 0.05) means the observed data are unlikely under H₀ — we reject H₀.
+- A **large p-value** (≥ 0.05) means the data are compatible with H₀ — we fail to reject H₀.
+
+> ⚠️ **Common misconceptions about the p-value:**
+>
+> ❌ "p = 0.03 means there is a 3% probability that H₀ is true." → **FALSE**
+>
+> ❌ "p > 0.05 proves H₀ is true." → **FALSE** (absence of evidence ≠ evidence of absence)
+>
+> ❌ "p < 0.05 means the effect is clinically important." → **FALSE** (significance ≠ importance)
+>
+> ✅ "p = 0.03 means: if H₀ were true, there would be a 3% chance of observing results this extreme or more extreme."
+
+## Type I and Type II Errors
+
+| Decision \ Reality | H₀ is TRUE | H₀ is FALSE |
+|---|---|---|
+| **Fail to reject H₀** | ✅ Correct (1 − α) | ❌ Type II error (β) |
+| **Reject H₀** | ❌ Type I error (α) | ✅ Correct — **Power** (1 − β) |
+
+- **Type I error (α):** Rejecting H₀ when it is actually true (false positive). Conventionally set at α = 0.05.
+- **Type II error (β):** Failing to reject H₀ when it is actually false (false negative).
+- **Statistical power (1 − β):** The probability of correctly detecting a true effect. A power of ≥ 80% is the standard target.
+
+## The 7-Step Process of Hypothesis Testing
+
+1. **State the hypotheses** (H₀ and H₁)
+2. **Set the significance level** (usually α = 0.05)
+3. **Choose the appropriate test** based on data type and design
+4. **Verify assumptions** (normality, equal variance, independence)
+5. **Compute the test statistic and p-value**
+6. **Make a decision** (reject H₀ if p ≤ α)
+7. **Draw a conclusion** in the context of your research question
+
+---
+
+# Choosing the Right Test
+
+The choice of test depends on the **type of your variables** and the **number of groups** you are comparing. The table below summarizes the most common situations:
+
+| Question | Normal data? | Test | Non-parametric alternative |
+|---|---|---|---|
+| Compare sample mean to a reference value | Yes | One-sample t-test | Wilcoxon signed-rank (1 sample) |
+| Compare 2 independent groups | Yes | Student / Welch t-test | Mann-Whitney U |
+| Compare 2 paired/matched measurements | Yes | Paired t-test | Wilcoxon signed-rank (paired) |
+| Compare ≥ 3 independent groups | Yes | One-way ANOVA | Kruskal-Wallis |
+| Compare ≥ 3 repeated measures | Yes | Repeated-measures ANOVA | Friedman |
+| Association between 2 categorical variables | — | Chi-squared | Fisher's exact (small n) |
+| Association between 2 continuous variables | Yes | Pearson correlation | Spearman / Kendall |
+
+> 💡 **Parametric tests** assume a specific distribution (usually normal). **Non-parametric tests** make no such assumption and are safer when that assumption is violated.
+
+---
+
+# Checking Assumptions Before Testing
+
+Before applying any parametric test, you must verify its assumptions.
+
+## Normality — Shapiro-Wilk Test
+
+The Shapiro-Wilk test checks whether a sample comes from a normal distribution.
+
+- **H₀:** The data follow a normal distribution
+- **H₁:** The data do not follow a normal distribution
+
+```{r shapiro}
+set.seed(42)
+# Systolic blood pressure in 20 patients
+PAS <- c(120, 130, 125, 118, 135, 122, 128, 132, 119, 126,
+         124, 131, 127, 121, 134, 123, 129, 133, 117, 130)
+
+sw <- shapiro.test(PAS)
+print(sw)
+
+# Automatic interpretation
+if (sw$p.value > 0.05) {
+  cat("Normality not rejected (p =", round(sw$p.value, 4), ")\n")
+  cat("=> Parametric tests are applicable.\n")
+} else {
+  cat("Normality rejected (p =", round(sw$p.value, 4), ")\n")
+  cat("=> Consider a non-parametric test.\n")
+}
+```
+
+### Visualizing normality: histogram and QQ-plot
+
+```{r normality-plots, fig.width=9, fig.height=4}
+par(mfrow = c(1, 2))
+
+hist(PAS, probability = TRUE, col = "lightblue",
+     main = "Histogram + Normal Curve",
+     xlab = "Systolic BP (mmHg)", border = "white")
+curve(dnorm(x, mean = mean(PAS), sd = sd(PAS)),
+      add = TRUE, col = "red", lwd = 2)
+
+qqnorm(PAS, main = "QQ-Plot", pch = 19, col = "steelblue")
+qqline(PAS, col = "red", lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
+> 💡 **For large samples (n ≥ 2000)**, Shapiro-Wilk loses relevance. Use the **Kolmogorov-Smirnov** or **Anderson-Darling** test instead (from the `nortest` package).
+
+## Equality of Variances
+
+When comparing two or more groups, parametric tests often assume equal variances (homoscedasticity).
+
+```{r variance-tests}
+set.seed(10)
+groupA <- rnorm(30, mean = 50, sd = 8)
+groupB <- rnorm(30, mean = 55, sd = 9)
+groupC <- rnorm(30, mean = 48, sd = 7)
+
+dat_var <- data.frame(
+  value = c(groupA, groupB, groupC),
+  group = rep(c("A", "B", "C"), each = 30)
+)
+
+# Bartlett test (assumes normality within each group)
+bartlett.test(value ~ group, data = dat_var)
+
+# Levene test (more robust to departures from normality)
+car::leveneTest(value ~ group, data = dat_var)
+```
+
+- **p > 0.05** → variances are homogeneous → classical ANOVA applicable
+- **p ≤ 0.05** → heterogeneous variances → use Welch's t-test or Welch's ANOVA (`oneway.test()`)
+
+---
+
+# The Student's t-Test
+
+The t-test compares means. It uses the **t-statistic**:
+
+$$t = \frac{\bar{x} - \mu_0}{s / \sqrt{n}}$$
+
+There are three variants depending on your design.
+
+## One-Sample t-Test
+
+Compares the mean of a sample to a known reference value.
+
+**Example:** Are the blood lead levels of children in an industrial area higher than the WHO threshold of 5 µg/dL?
+
+```{r one-sample-ttest}
+set.seed(7)
+blood_lead <- c(7.2, 6.8, 8.1, 5.9, 9.3, 7.5, 6.4, 8.7, 7.1, 6.9,
+                8.3, 7.8, 6.2, 9.1, 7.4, 8.0, 6.7, 7.6, 8.5, 7.3,
+                6.1, 8.9, 7.0, 6.6, 8.2)
+
+# One-sided test: is the mean greater than 5?
+t.test(blood_lead, mu = 5, alternative = "greater")
+```
+
+The very small p-value leads us to **reject H₀** — blood lead levels significantly exceed the WHO threshold.
+
+## Independent (Unpaired) t-Test
+
+Compares the means of **two separate, unrelated groups**.
+
+**Example:** Do male and female Star Wars characters differ in height?
+
+```{r independent-ttest}
+my_sw <- starwars %>%
+  select(sex, height) %>%
+  filter(sex %in% c("male", "female")) %>%
+  drop_na(height)
+
+# Visualize first
+my_sw %>%
+  ggplot(aes(x = height, fill = sex)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Height Distribution by Sex — Star Wars Characters",
+       x = "Height (cm)", fill = "Sex")
+```
+
+```{r independent-ttest-test}
+t.test(height ~ sex, data = my_sw)
+```
+
+**Reading the output:**
+
+- **t-statistic:** How many standard errors separate the two means
+- **df:** Degrees of freedom (Welch adjustment for unequal variances)
+- **p-value:** Decision criterion
+- **95% CI:** Plausible range for the true difference in means
+- **Sample estimates:** The observed means for each group
+
+**Example from biology (penguins):**
+
+```{r penguins-ttest}
+library(palmerpenguins)
+
+penguins %>%
+  filter(species %in% c("Adelie", "Chinstrap")) %>%
+  drop_na(bill_length_mm) %>%
+  t.test(bill_length_mm ~ species, data = .)
+```
+
+## Paired t-Test
+
+Used when each observation in one group is **matched or linked** to an observation in the other — e.g., the same patient measured before and after a treatment.
+
+**Example:** Do two sleep drugs produce different amounts of extra sleep in the same patients?
+
+```{r paired-ttest-viz}
+# The built-in `sleep` dataset: 10 patients, 2 drugs each
+sleep %>%
+  mutate(group = paste("Drug", group)) %>%
+  group_by(group) %>%
+  mutate(mean_extra = mean(extra)) %>%
+  ungroup() %>%
+  ggplot(aes(x = extra, fill = group)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(aes(xintercept = mean_extra, color = group),
+             linewidth = 1, linetype = "dashed") +
+  theme_minimal() +
+  labs(title = "Extra Sleep by Drug — Same 10 Patients",
+       x = "Extra sleep (hours)", fill = "Drug", color = "Drug")
+```
+
+```{r paired-ttest-test}
+sleep_wide <- sleep %>%
+  pivot_wider(names_from = group, values_from = extra, names_prefix = "drug_")
+
+t.test(sleep_wide$drug_1, sleep_wide$drug_2, paired = TRUE)
+```
+
+> ⚠️ **Independent vs. Paired — choose correctly!**
+>
+> - Different subjects in each group → **Independent t-test**
+> - Same subjects measured twice, or matched pairs → **Paired t-test**
+>
+> Using the wrong test can lead to incorrect conclusions or reduced statistical power.
+
+## Key Arguments of `t.test()`
+
+| Argument | Meaning | Default |
+|---|---|---|
+| `x`, `y` | Numeric vectors (or formula `y ~ group`) | — |
+| `alternative` | `"two.sided"`, `"less"`, or `"greater"` | `"two.sided"` |
+| `mu` | Reference value under H₀ | `0` |
+| `paired` | Is the test paired? | `FALSE` |
+| `var.equal` | Assume equal variances? (`FALSE` = Welch) | `FALSE` |
+| `conf.level` | Confidence level for the CI | `0.95` |
+
+## Extracting Results Programmatically
+
+```{r extract-ttest}
+result <- t.test(height ~ sex, data = my_sw)
+
+result$p.value      # p-value
+result$statistic    # t-statistic
+result$conf.int     # confidence interval
+result$estimate     # group means
+```
+
+---
+
+# The Non-Parametric Alternative: Wilcoxon Test
+
+When normality is violated, use `wilcox.test()` — it makes no distributional assumption and compares **medians** (or rank-based differences).
+
+```{r wilcoxon}
+# One-sample: is the median different from a reference?
+wilcox.test(blood_lead, mu = 5, alternative = "greater")
+
+# Two-sample (independent):
+AH <- c(7, 9, 8, 9, 10, 7, 8, 9, 8, 9)   # group 1
+AF <- c(5, 6, 7, 5, 6, 7, 6, 5, 7, 6)   # group 2
+wilcox.test(AH, AF)
+
+# Paired version:
+wilcox.test(sleep_wide$drug_1, sleep_wide$drug_2, paired = TRUE)
+```
+
+---
+
+# The Chi-Squared Test
+
+The chi-squared test (`chisq.test()`) assesses whether two **categorical variables** are independent. It compares **observed frequencies** to what we would **expect** if the variables were unrelated.
+
+- **H₀:** The two variables are independent (no association)
+- **H₁:** The two variables are not independent (there is an association)
+
+## Chi-Squared Test of Independence
+
+**Example:** Was survival on the Titanic associated with passenger class?
+
+```{r chisq-titanic}
+titanic_df <- Titanic %>%
+  as_tibble() %>%
+  uncount(n) %>%
+  filter(Class != "Crew")
+
+# Contingency table
+tab <- table(titanic_df$Class, titanic_df$Survived)
+tab
+```
+
+```{r chisq-titanic-test}
+chisq.test(tab)
+```
+
+**Interpreting the output:**
+
+- **X-squared:** The test statistic. Larger = more deviation from independence.
+- **df:** (rows − 1) × (columns − 1)
+- **p-value:** If < 0.05, reject H₀
+
+The extremely small p-value confirms a **highly significant association** between class and survival.
+
+## Chi-Squared Goodness-of-Fit
+
+When you have a **single categorical variable** and want to test whether its proportions match a theoretical distribution:
+
+```{r chisq-gof}
+library(forcats)
+
+my_marital <- gss_cat %>%
+  select(marital) %>%
+  filter(marital %in% c("Married", "Never married", "Divorced")) %>%
+  mutate(marital = fct_drop(marital))
+
+chisq.test(table(my_marital))
+```
+
+A tiny p-value: the three marital statuses are **not equally distributed** in the population.
+
+## Fisher's Exact Test
+
+For **small samples** where expected cell counts are < 5, use Fisher's exact test:
+
+```{r fisher}
+# Small contingency table
+cancer_types <- c("Lung", "Breast", "Prostate", "Lung", "Breast")
+response     <- c("Yes", "No", "Yes", "No", "Yes")
+
+fisher.test(table(cancer_types, response))
+```
+
+> 💡 **Rule of thumb:** Use `chisq.test()` when all expected frequencies ≥ 5. Use `fisher.test()` otherwise.
+
+---
+
+# ANOVA — Analysis of Variance
+
+ANOVA tests whether the **means of three or more groups** are significantly different. Despite the name, it works by comparing **variances**: the variance *between* groups vs. the variance *within* groups.
+
+- **H₀:** All group means are equal (μ₁ = μ₂ = ... = μₖ)
+- **H₁:** At least one group mean is different
+
+The test statistic is the **F-ratio:**
+
+$$F = \frac{\text{Variance between groups}}{\text{Variance within groups}}$$
+
+A large F-ratio means the groups differ more than expected by chance → reject H₀.
+
+## One-Way ANOVA
+
+One categorical independent variable, one continuous dependent variable.
+
+**Example:** Does life expectancy differ across continents in 2007?
+
+```{r anova-gapminder-viz}
+library(gapminder)
+
+gapminder_2007 <- gapminder %>% filter(year == 2007)
+
+gapminder_2007 %>%
+  ggplot(aes(x = fct_reorder(continent, lifeExp),
+             y = lifeExp, fill = continent)) +
+  geom_boxplot(alpha = 0.6, width = 0.5) +
+  geom_jitter(aes(colour = continent), width = 0.15, alpha = 0.5, size = 2) +
+  stat_summary(fun = mean, geom = "point",
+               shape = 23, size = 3, fill = "white") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "Life Expectancy by Continent (2007)",
+       subtitle = "Diamond = group mean",
+       x = NULL, y = "Life Expectancy (years)")
+```
+
+```{r anova-gapminder-test}
+mod <- aov(lifeExp ~ continent, data = gapminder_2007)
+summary(mod)
+```
+
+**Reading the ANOVA table:**
+
+| Column | Meaning |
+|---|---|
+| **Df** | Degrees of freedom: between groups = k−1; within = n−k |
+| **Sum Sq** | Total variability explained by the factor (between) or residual (within) |
+| **Mean Sq** | Sum of squares / degrees of freedom |
+| **F value** | Ratio of between-group to within-group variance |
+| **Pr(>F)** | p-value |
+
+With p < 2e-16, we **reject H₀** — life expectancy differs significantly across continents.
+
+## Post-Hoc Test: Tukey HSD
+
+ANOVA tells you *that* at least one group differs — but not *which* pairs. **Tukey's Honest Significant Differences** (HSD) test performs all pairwise comparisons with a correction for multiple testing.
+
+```{r tukey}
+TukeyHSD(mod)
+```
+
+```{r tukey-plot, fig.height=6}
+plot(TukeyHSD(mod), las = 1)
+```
+
+Each row shows the estimated difference and 95% CI for a pair of continents. Intervals that **do not cross zero** indicate a significant difference.
+
+## Two-Way ANOVA
+
+When you have **two categorical independent variables**.
+
+```{r two-way-anova}
+set.seed(42)
+group <- rep(c("A1", "A2", "A3"), times = 4)
+value <- runif(12, 10, 20)
+year  <- as.factor(c(rep("2010", 6), rep("2020", 6)))
+df2   <- data.frame(value, group, year)
+
+# Interaction model (group * year)
+mod2 <- aov(value ~ group * year, data = df2)
+summary(mod2)
+```
+
+- `group`: main effect of group
+- `year`: main effect of year
+- `group:year`: interaction — does the effect of group differ depending on year?
+
+## ANOVA with the Pipe
+
+```{r anova-pipe}
+msleep %>%
+  select(vore, sleep_rem) %>%
+  drop_na() %>%
+  aov(sleep_rem ~ vore, data = .) %>%
+  summary()
+```
+
+## Non-Parametric Alternative: Kruskal-Wallis Test
+
+When normality is violated in ≥ 3 groups:
+
+```{r kruskal}
+kruskal.test(sleep_rem ~ vore,
+             data = msleep %>% drop_na(vore, sleep_rem))
+```
+
+---
+
+# Correlation Tests
+
+Correlation measures the **strength and direction** of a linear (or monotonic) relationship between two continuous variables.
+
+> ⚠️ **Correlation implies association, not causation.**
+
+## Pearson Correlation
+
+For two **normally distributed** continuous variables. Measures **linear** association.
+
+- **r = 1:** Perfect positive linear relationship
+- **r = 0:** No linear relationship
+- **r = −1:** Perfect negative linear relationship
+
+```{r pearson}
+cor.test(mtcars$wt, mtcars$mpg, method = "pearson")
+```
+
+## Spearman's Rank Correlation
+
+For **ordinal** data or when normality is violated. Measures **monotonic** association.
+
+```{r spearman}
+cor.test(mtcars$wt, mtcars$mpg, method = "spearman")
+```
+
+## Kendall's Tau
+
+Another rank-based correlation, often preferred for small samples or when there are many ties.
+
+```{r kendall}
+cor.test(mtcars$wt, mtcars$mpg, method = "kendall")
+```
+
+## Interpreting Correlation Coefficients
+
+| |r| range | Interpretation |
+|---|---|
+| 0.00 – 0.19 | Negligible |
+| 0.20 – 0.39 | Weak |
+| 0.40 – 0.59 | Moderate |
+| 0.60 – 0.79 | Strong |
+| 0.80 – 1.00 | Very strong |
+
+A negative sign means the variables move in opposite directions.
+
+## Extracting Results Programmatically
+
+```{r cor-extract}
+res <- cor.test(mtcars$wt, mtcars$mpg, method = "pearson")
+
+res$estimate    # correlation coefficient (r)
+res$p.value     # p-value
+res$conf.int    # 95% confidence interval for r
+```
+
+## Correlation Matrix
+
+To explore associations among multiple variables simultaneously:
+
+```{r cor-matrix}
+# Correlation coefficients
+cor(iris[, 1:4], method = "pearson")
+```
+
+For a visual correlation matrix with significance:
+
+```{r cor-visual, fig.height=5}
+iris[, 1:4] %>%
+  cor() %>%
+  as.data.frame() %>%
+  rownames_to_column("Var1") %>%
+  pivot_longer(-Var1, names_to = "Var2", values_to = "r") %>%
+  ggplot(aes(x = Var1, y = Var2, fill = r)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(r, 2)), size = 4) +
+  scale_fill_gradient2(low = "steelblue", mid = "white",
+                       high = "tomato", midpoint = 0,
+                       limits = c(-1, 1)) +
+  theme_minimal() +
+  labs(title = "Correlation Matrix — Iris Dataset",
+       x = NULL, y = NULL, fill = "r")
+```
+
+---
+
+# Normality and Variance Tests — Summary
+
+## Test of Variance Equality — Fisher's F Test
+
+Tests whether two samples have the same variance:
+
+```{r var-test}
+var.test(mtcars$mpg, mtcars$wt)
+```
+
+- **H₀:** The two variances are equal
+- **H₁:** The variances are different
+
+## Kolmogorov-Smirnov Test
+
+Tests whether two samples come from the same distribution:
+
+```{r ks-test}
+ks.test(rnorm(100, 5, 1), rnorm(100, 5, 1.5))
+```
+
+---
+
+# Complete Statistical Test Reference
+
+## Summary Table
+
+```{r summary-table, echo=FALSE}
+tibble::tribble(
+  ~Test,                   ~Function,            ~H0,                                    ~When_to_use,
+  "One-sample t-test",     "t.test(x, mu=)",     "Mean = reference value",               "1 group, compare to reference",
+  "Independent t-test",    "t.test(x, y)",       "Mean(x) = Mean(y)",                    "2 independent groups",
+  "Paired t-test",         "t.test(x,y,paired=TRUE)", "Mean difference = 0",            "2 matched/repeated measures",
+  "Wilcoxon (1-sample)",   "wilcox.test(x,mu=)", "Median = reference",                   "1 group, non-normal",
+  "Mann-Whitney U",        "wilcox.test(x,y)",   "Median(x) = Median(y)",                "2 independent groups, non-normal",
+  "Wilcoxon signed-rank",  "wilcox.test(x,y,paired=TRUE)", "Median difference = 0",     "2 paired groups, non-normal",
+  "One-way ANOVA",         "aov(y ~ group)",      "All group means equal",               "≥3 groups, parametric",
+  "Kruskal-Wallis",        "kruskal.test()",      "All group medians equal",             "≥3 groups, non-parametric",
+  "Chi-squared",           "chisq.test()",        "Variables are independent",           "2 categorical variables",
+  "Fisher's exact",        "fisher.test()",       "Variables are independent",           "2 categorical, small n",
+  "Shapiro-Wilk",          "shapiro.test()",      "Data are normally distributed",       "Test normality assumption",
+  "Bartlett",              "bartlett.test()",     "All group variances equal",           "Test homoscedasticity",
+  "Levene",                "car::leveneTest()",   "All group variances equal",           "Robust alternative to Bartlett",
+  "Fisher F-test",         "var.test()",          "Var(x) = Var(y)",                     "Compare 2 variances",
+  "KS test",               "ks.test()",           "Same distribution",                   "Compare 2 distributions",
+  "Pearson correlation",   "cor.test(method='pearson')", "No linear association",       "2 normal continuous variables",
+  "Spearman correlation",  "cor.test(method='spearman')", "No monotonic association",  "Ordinal or non-normal data",
+  "Tukey HSD",             "TukeyHSD(aov_obj)",   "No pairwise difference",             "Post-hoc after ANOVA"
+) %>%
+  knitr::kable(col.names = c("Test", "R function", "H₀", "When to use"))
+```
+
+---
+
+# A Complete Worked Example
+
+## Setting Up a Simulated School Dataset
+
+```{r school-data}
+set.seed(7)
+s      <- c("Female", "Male")
+sexe   <- sample(s, 423, replace = TRUE)
+a      <- c(15, 15, 16, 16, 16, 17, 17, 17, 17, 18, 18, 19, 20)
+age    <- sample(a, 423, replace = TRUE)
+cl     <- c("A", "B", "C")
+classe <- sample(cl, 423, replace = TRUE)
+
+anglais  <- round(rnorm(423, 7, 0.5) + ifelse(sexe == "Female", 2, 0), 0)
+info     <- round(rnorm(423, 5, 3)   + ifelse(age >= 19, 2, 0), 0)
+art      <- round(rnorm(423, 4, 3)   + ifelse(classe == "C", 2, -1), 0)
+histoire <- round(rnorm(423, 6, 2)   + ifelse(classe == "B" & sexe == "Male", 2, 0), 0)
+moyenne  <- (anglais + info + art + histoire) / 4
+
+ecole <- data.frame(age, sexe, classe, anglais, info, art, histoire, moyenne)
+rm(age, classe, sexe, anglais, info, art, histoire)
+
+# Clip scores to [0, 10]
+for (v in c("anglais", "info", "art", "histoire")) {
+  ecole[[v]] <- pmin(pmax(ecole[[v]], 0), 10)
+}
+```
+
+## Chi-Squared: Is class associated with student level?
+
+```{r chi2-ecole}
+ecole$niveau <- sample(c(1, 2, 3), 423, replace = TRUE)
+ecole$niveau <- ordered(ecole$niveau, labels = c("Average", "Good", "Excellent"))
+
+# Contingency table with proportions
+round(100 * prop.table(table(ecole$classe, ecole$niveau), 1), 0)
+
+# Chi-squared test
+chisq.test(table(ecole$classe, ecole$niveau))
+```
+
+**Interpretation:** If p < 0.05, we reject H₀ and conclude that class and student level are **not independent** — there is a significant association.
+
+## t-Test: Do females and males have the same English scores?
+
+```{r ttest-ecole}
+t.test(anglais ~ sexe, data = ecole)
+```
+
+## ANOVA: Do mean scores differ across classes?
+
+```{r anova-ecole}
+mod_ecole <- aov(moyenne ~ classe, data = ecole)
+summary(mod_ecole)
+TukeyHSD(mod_ecole)
+```
+
+## Correlation: Is the history score related to the overall average?
+
+```{r cor-ecole}
+cor.test(ecole$histoire, ecole$moyenne, method = "pearson")
+```
+
+## Shapiro-Wilk: Is the `info` score normally distributed?
+
+```{r shapiro-ecole}
+shapiro.test(ecole$info)
+```
+
+If p < 0.05 → data are **not** normally distributed → use Wilcoxon instead of t-test.
+
+---
+
+# Confidence Intervals
+
+A **confidence interval** provides a range of plausible values for the true population parameter. A 95% CI means: if we repeated this study 100 times, 95 of those intervals would contain the true value.
+
+```{r confidence-interval}
+# Cholesterol levels of 7 patients
+cholesterol <- c(210, 220, 230, 250, 260, 240, 245)
+
+# 95% confidence interval for the mean
+t.test(cholesterol)$conf.int
+
+# 99% confidence interval
+t.test(cholesterol, conf.level = 0.99)$conf.int
+```
+
+> 💡 A wider CI reflects **more uncertainty** (smaller sample, higher confidence level). A narrower CI reflects **more precision**.
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Using the `ChickWeight` dataset, test whether the average weight at day 21 differs between Diet 1 and Diet 4. First visualize the distributions, check normality, then apply the appropriate test.
+
+**Exercise 2.** Using the `Titanic` dataset, test whether survival is associated with sex. Build the contingency table, visualize it, and run both a chi-squared test and Fisher's exact test.
+
+**Exercise 3.** Using the `msleep` dataset, test whether total sleep differs across diet types (`vore`). Apply a one-way ANOVA, check its assumptions with Shapiro-Wilk and Levene, and run Tukey HSD if the result is significant.
+
+**Exercise 4.** Using `mtcars`, test whether there is a significant correlation between engine displacement (`disp`) and fuel efficiency (`mpg`). Run all three correlation methods (Pearson, Spearman, Kendall) and compare the results.
+
+**Exercise 5.** Using the `sleep` dataset, compare the extra sleep produced by Drug 1 vs. Drug 2 using both an **independent** and a **paired** t-test. Explain why the results differ and which test is more appropriate.
+
+**Exercise 6.** Create a dataset of blood pressure measurements for 30 patients before and after a treatment. Test whether the treatment had a significant effect using the paired t-test. Then check normality and, if violated, repeat with the Wilcoxon signed-rank test.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Hypothesis Testing in R*

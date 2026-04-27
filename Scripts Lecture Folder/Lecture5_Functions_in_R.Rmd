@@ -1,0 +1,817 @@
+---
+title: "Functions in R"
+subtitle: "A Comprehensive Lecture — From Built-in Functions to Advanced Patterns"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##")
+```
+
+---
+
+# What is a Function?
+
+A **function** is a named, reusable block of code that performs a specific task. Think of it as a recipe: you define the steps once, then call the recipe by name whenever you need to repeat those steps — possibly with different ingredients each time.
+
+Functions are the single most important tool for writing clean, efficient, maintainable R code. They allow you to:
+
+- **Avoid repetition** — write the logic once, use it many times
+- **Organize code** — break complex problems into small, testable units
+- **Communicate intent** — a well-named function makes code self-documenting
+
+In R, *everything that does something is a function* — `+`, `<-`, `[`, `print()`, even `if()` are all functions under the hood.
+
+---
+
+# Built-in Functions
+
+R ships with hundreds of ready-to-use functions. You have already used many of them.
+
+## Getting Help on Any Function
+
+```{r help, eval=FALSE}
+?mean          # Opens the help page for mean()
+help("mean")   # Same result
+help(sum)      # Works without quotes too
+```
+
+A full reference card of built-in functions is available at:  
+<https://cran.r-project.org/doc/contrib/Short-refcard.pdf>
+
+## Common Built-in Functions
+
+### Math functions
+
+```{r builtin-math}
+max(20, 77, 85, 12)       # Maximum value
+min(20, 77, 85, 12)       # Minimum value
+abs(-7.5)                 # Absolute value
+sqrt(16)                  # Square root
+ceiling(4.2)              # Round up
+floor(4.8)                # Round down
+round(3.14159, digits = 2) # Round to 2 decimal places
+log(10)                   # Natural logarithm (base e)
+log10(100)                # Base-10 logarithm
+exp(1)                    # e^1 ≈ 2.718
+```
+
+### Vector summary functions
+
+```{r builtin-vector}
+x <- c(4, 7, 2, 9, 1, 5, 8, 3, 6, 10)
+
+mean(x)       # Arithmetic mean
+median(x)     # Median
+sd(x)         # Standard deviation
+var(x)        # Variance
+sum(x)        # Sum of all elements
+range(x)      # Min and max as a 2-element vector
+IQR(x)        # Interquartile range
+length(x)     # Number of elements
+sort(x)       # Sort in ascending order
+rev(x)        # Reverse order
+```
+
+### String functions
+
+```{r builtin-string}
+nchar("Tchoutang")              # Number of characters
+toupper("hello")                # Uppercase
+tolower("WORLD")                # Lowercase
+paste("R", "is", "great")       # Concatenate with space
+paste0("gene", "_", "BRCA1")    # Concatenate without separator
+grepl("^A", c("Apple","Banana","Avocado"))  # Pattern detection
+```
+
+### Sequence generation functions
+
+```{r builtin-sequence}
+# seq(): flexible numeric sequences
+seq(from = 1, to = 10, by = 2)             # Step by 2
+seq(from = 4, to = 200, by = 5)            # Larger steps
+seq(from = 0, to = 1, length.out = 5)      # 5 evenly spaced values
+
+# rep(): repeat values
+rep(c(1, 2, 3), times = 3)   # Repeat the whole vector 3 times
+rep(c(1, 2, 3), each  = 2)   # Repeat each element 2 times
+
+# sample(): random sampling
+sample(1:100, size = 7)                    # 7 random values, no replacement
+sample(c("A","T","G","C"), 10, replace = TRUE)  # Random DNA bases
+```
+
+### Data structure inspection functions
+
+```{r builtin-inspect}
+str(airquality)       # Structure: types and first values
+head(airquality)      # First 6 rows
+tail(airquality, 3)   # Last 3 rows
+dim(airquality)       # Rows × Columns
+nrow(airquality)      # Number of rows
+ncol(airquality)      # Number of columns
+summary(airquality)   # Statistical summary per column
+names(airquality)     # Column names
+```
+
+### Handling missing values
+
+```{r builtin-na}
+x <- c(3, 5, NA, 8, NA, 2)
+
+is.na(x)                  # Which elements are NA?
+sum(is.na(x))             # How many NAs?
+mean(x)                   # NA — because of missing values
+mean(x, na.rm = TRUE)     # Correct: ignore NAs
+```
+
+> 💡 Many R functions have an `na.rm` argument. Setting `na.rm = TRUE` removes missing values before the calculation.
+
+---
+
+# Creating Your Own Functions
+
+## The Basic Template
+
+```r
+function_name <- function(parameter1, parameter2, ...) {
+  # body: code that runs each time the function is called
+  result <- ...
+  return(result)
+}
+```
+
+- **`function_name`** — a descriptive name (use `snake_case` or `camelCase` consistently)
+- **`parameter1, parameter2`** — the inputs (also called *arguments* when passed by the caller)
+- **`return(result)`** — the output; what the function hands back
+
+## Your First Function — No Parameters
+
+```{r first-function}
+greet <- function() {
+  print("Hello, everyone!")
+}
+
+# Call the function as many times as needed
+greet()
+greet()
+greet()
+```
+
+## Function with Parameters
+
+```{r function-params}
+# Two parameters
+full_name <- function(first, last) {
+  paste(first, last)
+}
+
+full_name("Alice", "Smith")
+full_name("Bob", "Jones")
+```
+
+## The `return()` Statement
+
+`return()` explicitly specifies what value the function sends back. R also returns the value of the last evaluated expression even without `return()`, but using it explicitly makes code clearer and stops execution immediately.
+
+```{r return-basic}
+# With explicit return
+multiply_by_10 <- function(n) {
+  return(10 * n)
+}
+
+print(multiply_by_10(5))
+print(multiply_by_10(15))
+print(multiply_by_10(20))
+```
+
+```{r return-implicit}
+# R also returns the last expression automatically
+add_two <- function(x) {
+  x + 2    # implicitly returned
+}
+add_two(6)
+```
+
+## A Function with Multiple Operations
+
+```{r function-multi}
+# Unit conversion: miles to kilometres
+mile_to_km <- function(miles) {
+  km <- miles * 1.60934
+  return(km)
+}
+
+mile_to_km(10)
+mile_to_km(26.2)   # a marathon!
+
+# Custom mean function (reimplementing what mean() does)
+my_mean <- function(v) {
+  total   <- sum(v)
+  n       <- length(v)
+  return(total / n)
+}
+
+my_mean(c(2, 4, 6, 8, 10))
+my_mean(c(10, 50, 20))
+```
+
+---
+
+# Function Arguments in Depth
+
+## Required vs Optional Arguments
+
+By default, all parameters are required. Calling a function with the wrong number of arguments produces an error:
+
+```{r required-args}
+describe <- function(fname, lname) {
+  paste(fname, lname)
+}
+
+describe("Peter", "Griffin")
+# describe("Peter")  # Error: argument "lname" is missing
+```
+
+## Default Parameter Values
+
+Provide a fallback value using `=` in the parameter list. Callers can override it or leave it as-is:
+
+```{r default-args}
+greet_country <- function(country = "Cameroon") {
+  paste("I am from", country)
+}
+
+greet_country("France")     # Override the default
+greet_country("Nigeria")
+greet_country()             # Uses the default: "Cameroon"
+```
+
+```{r default-bmi}
+# BMI calculator with a default height
+calculate_bmi <- function(weight, height = 1.75) {
+  bmi <- weight / (height^2)
+  return(bmi)
+}
+
+calculate_bmi(70)            # Uses default height 1.75
+calculate_bmi(70, 1.80)     # Override height
+```
+
+## Positional vs Named Arguments
+
+Arguments can be passed by **position** (order matters) or by **name** (order does not matter):
+
+```{r named-args}
+power_message <- function(region, value, p) {
+  paste(region, "raised to power", p, "is", value^p)
+}
+
+# Positional — must be in the right order
+power_message("Centre", 50, 2)
+
+# Named — order doesn't matter
+power_message(value = 50, p = 2, region = "Centre")
+power_message(p = 3, region = "Far North", value = 120)
+```
+
+> 💡 **Best practice:** For functions with 3+ arguments, using named arguments makes your code more readable and less error-prone.
+
+## The `...` (Dots) Argument — Passing Extra Arguments
+
+The `...` (pronounced "dot-dot-dot" or "ellipsis") allows a function to accept any number of additional arguments and pass them on to another function:
+
+```{r dots-arg}
+# Wraps mean() but passes any extra arguments through
+my_mean_safe <- function(x, ...) {
+  mean(x, ...)
+}
+
+cases <- c(850, 900, 920, 950, 975, NA)
+
+my_mean_safe(cases)                    # Returns NA (because of NA)
+my_mean_safe(cases, na.rm = TRUE)      # Passes na.rm to mean()
+```
+
+This is the pattern used in most wrapper functions throughout the tidyverse and base R.
+
+---
+
+# Variable Scope
+
+**Scope** determines where a variable is visible — which parts of your code can read or write it.
+
+## Local Variables (Inside a Function)
+
+Variables created inside a function are **local** — they exist only during that function call and disappear afterward:
+
+```{r local-scope}
+compute <- function(x) {
+  y <- x + 100   # y is LOCAL — only lives inside this function
+  return(y)
+}
+
+compute(5)
+exists("y")   # FALSE — y does not exist in the global environment
+```
+
+## Global Variables (Outside a Function)
+
+Variables created outside any function are **global** and can be read from inside any function:
+
+```{r global-read}
+species_name <- "Homo sapiens"
+
+display_species <- function() {
+  paste("Organism:", species_name)   # Reads the global variable
+}
+
+display_species()
+```
+
+## Local vs Global — Name Shadowing
+
+If you create a variable *inside* a function with the same name as a global variable, the local copy **shadows** the global one — but does not change it:
+
+```{r name-shadow}
+txt <- "global variable"
+
+my_function <- function() {
+  txt <- "local variable"    # Creates a local copy
+  paste("Inside function: R is", txt)
+}
+
+my_function()
+txt    # Global is unchanged: still "global variable"
+```
+
+## The Global Assignment Operator `<<-`
+
+`<<-` forces a variable to be written into the **global** (or parent) environment from inside a function:
+
+```{r global-assign}
+my_function <- function() {
+  new_str <<- "powerful!"    # Writes to the global environment
+  paste("R is", new_str)
+}
+
+my_function()
+print(new_str)   # Now visible globally
+```
+
+> ⚠️ Use `<<-` sparingly. It creates hidden side effects that make functions harder to test and debug. Prefer returning values explicitly with `return()`.
+
+## Scope Summary
+
+| Variable created… | Visible… | Modified with… |
+|---|---|---|
+| Outside any function | Everywhere (global) | `<-` or `=` |
+| Inside a function | Only inside that function (local) | `<-` or `=` |
+| Inside a function, using `<<-` | Globally from inside the function | `<<-` |
+
+---
+
+# Nested Functions
+
+## Calling a Function Inside Another Function
+
+```{r nested-call}
+add <- function(x, y) {
+  return(x + y)
+}
+
+# Use add() inside another call to add()
+add(add(2, 2), add(3, 3))   # (2+2) + (3+3) = 10
+```
+
+## Defining a Function Inside Another Function
+
+An **inner function** (closure) captures variables from its enclosing function:
+
+```{r nested-define}
+outer_func <- function(x) {
+  inner_func <- function(y) {
+    return(x + y)   # x is captured from outer_func's scope
+  }
+  return(inner_func)   # Return the inner function itself
+}
+
+# Step 1: call outer_func to create the inner function with x = 3
+add_three <- outer_func(3)
+
+# Step 2: call the resulting function with y = 5
+add_three(5)    # 3 + 5 = 8
+add_three(10)   # 3 + 10 = 13
+```
+
+This pattern — returning a function that "remembers" some of the outer state — is called a **closure** and is used extensively in functional programming.
+
+---
+
+# Recursive Functions
+
+A **recursive function** calls itself. It is useful for problems that can naturally be broken into smaller identical sub-problems (e.g. factorials, Fibonacci numbers, tree traversal).
+
+Every recursive function needs:
+1. A **base case** — a condition that stops the recursion
+2. A **recursive call** — where the function calls itself with a simpler input
+
+```{r recursion-triangular}
+# Triangular number: sum of 1 + 2 + 3 + ... + k
+tri_recursion <- function(k) {
+  if (k > 0) {
+    result <- k + tri_recursion(k - 1)   # recursive call
+    return(result)
+  } else {
+    return(0)   # base case: stop at 0
+  }
+}
+
+tri_recursion(6)   # 6 + 5 + 4 + 3 + 2 + 1 = 21
+```
+
+```{r recursion-factorial}
+# Factorial: n! = n × (n-1)!
+factorial_r <- function(n) {
+  if (n <= 1) return(1)           # base case
+  return(n * factorial_r(n - 1))  # recursive call
+}
+
+factorial_r(5)   # 5! = 120
+factorial_r(10)
+```
+
+> ⚠️ Recursion can consume a lot of memory and time if not designed carefully. R also has a default recursion limit. For large inputs, prefer iterative loops.
+
+---
+
+# Applying Functions over Data: `lapply()`, `sapply()`, `apply()`
+
+Instead of writing a `for` loop to apply the same function to every column or element, R provides a family of **apply functions** that are more concise and often faster.
+
+## `lapply()` — Apply to a List, Return a List
+
+```{r lapply}
+# Apply mean() to every column of airquality
+result_list <- lapply(airquality, mean, na.rm = TRUE)
+result_list
+```
+
+## `sapply()` — Apply to a List, Return a Simplified Vector
+
+```{r sapply}
+# Same as lapply but returns a named numeric vector
+sapply(airquality, mean, na.rm = TRUE)
+
+# sapply with a custom function
+sapply(airquality, function(col) sum(is.na(col)))  # Count NAs per column
+```
+
+## `apply()` — Apply over Rows or Columns of a Matrix
+
+```{r apply-matrix}
+m <- matrix(1:12, nrow = 3, ncol = 4)
+
+apply(m, MARGIN = 1, FUN = sum)   # MARGIN = 1 → apply over rows
+apply(m, MARGIN = 2, FUN = mean)  # MARGIN = 2 → apply over columns
+```
+
+## Equivalence with a `for` Loop
+
+```{r apply-vs-for}
+# These two are equivalent:
+
+# for loop version
+for (i in 1:ncol(airquality)) {
+  cat(names(airquality)[i], ":", mean(airquality[, i], na.rm = TRUE), "\n")
+}
+
+# sapply version — much shorter
+sapply(airquality, mean, na.rm = TRUE)
+```
+
+---
+
+# `do.call()` — Call a Function Programmatically
+
+`do.call()` calls a function and passes a **list** as its arguments. This is powerful when the number of arguments is determined at runtime:
+
+```{r do-call}
+# Build a repeated vector dynamically
+make_rep <- function(a) rep(a, 3)
+
+do.call(make_rep, list(a = 5))   # Equivalent to make_rep(a = 5)
+
+# Combine multiple data frames into one
+df1 <- data.frame(x = 1:3, y = c("a", "b", "c"))
+df2 <- data.frame(x = 4:6, y = c("d", "e", "f"))
+df3 <- data.frame(x = 7:9, y = c("g", "h", "i"))
+
+do.call(rbind, list(df1, df2, df3))   # Stack all three at once
+```
+
+---
+
+# Functions with `if/else` for Validation
+
+Functions often need to validate their inputs before doing any work:
+
+```{r function-validation}
+classify_score <- function(score) {
+  if (!is.numeric(score)) return("Error: score must be numeric")
+  if (score < 0 | score > 100) return("Error: score must be between 0 and 100")
+
+  if (score >= 90) return("A")
+  else if (score >= 80) return("B")
+  else if (score >= 70) return("C")
+  else if (score >= 60) return("D")
+  else return("F")
+}
+
+classify_score(95)
+classify_score(72)
+classify_score(42)
+classify_score(-5)
+classify_score("high")
+```
+
+---
+
+# Functions with Loops Inside
+
+Functions can contain any R code, including loops:
+
+```{r function-loop}
+# Print the squares of 1 to n
+print_squares <- function(n) {
+  for (i in 1:n) {
+    print(paste(i, "squared is", i^2))
+  }
+}
+
+print_squares(5)
+```
+
+```{r function-loop-2}
+# Calculate GC content of a DNA sequence
+gc_content <- function(sequence) {
+  bases      <- strsplit(sequence, "")[[1]]
+  seq_length <- length(bases)
+  g_count    <- sum(bases == "G")
+  c_count    <- sum(bases == "C")
+  gc_pct     <- (g_count + c_count) / seq_length * 100
+  return(round(gc_pct, 2))
+}
+
+gc_content("ATGCGCGGCCAATTTTGGCCGCGG")
+gc_content("AAAATTTTGGGG")
+```
+
+---
+
+# Packages — Extending R with More Functions
+
+R packages are collections of functions, data, and documentation bundled together. Think of them as *toolboxes* — you install them once and load them whenever needed.
+
+## Installing and Loading Packages
+
+```{r packages, eval=FALSE}
+# Install once (only need to do this once per machine)
+install.packages("dplyr")
+install.packages("ggplot2")
+
+# Load for the current session (must do every time you restart R)
+library(dplyr)
+library(ggplot2)
+```
+
+## Using a Package Without Loading It
+
+You can call a function from a package without loading the whole package using `::`:
+
+```{r double-colon, eval=FALSE}
+dplyr::filter(mtcars, cyl == 6)   # Use filter() from dplyr without library(dplyr)
+```
+
+## Discovering Functions in a Package
+
+```{r package-explore, eval=FALSE}
+ls("package:dplyr")    # List all exported functions in dplyr
+help(package = "dplyr") # Open the package help page
+```
+
+## Getting Help on Functions
+
+```{r help-functions, eval=FALSE}
+?mean           # Help page for mean()
+?dplyr::filter  # Help page for dplyr's filter()
+args(mean)      # Show function signature (parameters)
+```
+
+---
+
+# Complete Worked Examples
+
+## Example 1 — Fraction to Percentage Formatter
+
+```{r example-percent}
+add_percent <- function(x, digits = 1) {
+  pct    <- round(x * 100, digits = digits)
+  result <- paste0(pct, "%")
+  return(result)
+}
+
+positivity_rates <- c(0.245, 0.318, 0.402, 0.178)
+add_percent(positivity_rates)
+add_percent(positivity_rates, digits = 0)
+```
+
+## Example 2 — BMI Classifier
+
+```{r example-bmi}
+bmi_category <- function(weight_kg, height_m = 1.70) {
+  bmi <- weight_kg / height_m^2
+  category <- if (bmi < 18.5) "Underweight"
+              else if (bmi < 25.0) "Normal weight"
+              else if (bmi < 30.0) "Overweight"
+              else "Obese"
+  return(paste0("BMI = ", round(bmi, 1), " (", category, ")"))
+}
+
+bmi_category(70)
+bmi_category(50, 1.65)
+bmi_category(100, 1.60)
+```
+
+## Example 3 — Bacterial Growth Rate
+
+```{r example-growth}
+bacterial_growth_rate <- function(initial, final, time) {
+  rate <- (log(final) - log(initial)) / time
+  return(round(rate, 4))
+}
+
+# Initial = 100 cells, Final = 1000 cells, over 5 hours
+r <- bacterial_growth_rate(100, 1000, 5)
+print(paste("Bacterial growth rate:", r, "per hour"))
+```
+
+## Example 4 — DNA to RNA Conversion
+
+```{r example-dna-rna}
+dna_to_rna <- function(dna_base) {
+  dna_base <- toupper(dna_base)
+  switch(dna_base,
+    "A" = "U",
+    "T" = "A",
+    "G" = "C",
+    "C" = "G",
+    "Invalid nucleotide"   # default
+  )
+}
+
+dna_to_rna("A")
+dna_to_rna("T")
+dna_to_rna("G")
+dna_to_rna("X")
+
+# Apply to a whole sequence using sapply
+dna_seq <- c("A", "T", "G", "C", "A", "T")
+sapply(dna_seq, dna_to_rna)
+```
+
+## Example 5 — Custom Statistical Summary
+
+```{r example-stats}
+# Custom mode function (R has no built-in mode for statistics)
+get_mode <- function(v) {
+  uniq_vals <- unique(v)
+  uniq_vals[which.max(tabulate(match(v, uniq_vals)))]
+}
+
+my_summary <- function(x) {
+  cat("N:       ", length(x), "\n")
+  cat("Mean:    ", round(mean(x, na.rm = TRUE), 3), "\n")
+  cat("Median:  ", median(x, na.rm = TRUE), "\n")
+  cat("Mode:    ", get_mode(x[!is.na(x)]), "\n")
+  cat("SD:      ", round(sd(x, na.rm = TRUE), 3), "\n")
+  cat("Min:     ", min(x, na.rm = TRUE), "\n")
+  cat("Max:     ", max(x, na.rm = TRUE), "\n")
+  cat("NAs:     ", sum(is.na(x)), "\n")
+}
+
+centre_daily <- c(102, 115, 110, 120, 118, 125, 130, 118, 122, 115)
+my_summary(centre_daily)
+```
+
+## Example 6 — Function with `dplyr` Integration
+
+```{r example-dplyr, message=FALSE}
+library(tidyverse)
+
+get_molecular_weight_kDa <- function(protein_name, dataset) {
+  result <- dataset %>%
+    filter(Protein == protein_name) %>%
+    mutate(Weight_kDa = Weight_Da / 1000) %>%
+    select(Protein, Weight_kDa)
+
+  if (nrow(result) == 0) {
+    return(paste("Protein", protein_name, "not found."))
+  }
+  return(result)
+}
+
+# Sample dataset
+proteins <- data.frame(
+  Protein    = c("Hemoglobin", "Myosin", "Collagen", "Insulin", "Albumin"),
+  Weight_Da  = c(64500, 223000, 300000, 5800, 66400)
+)
+
+get_molecular_weight_kDa("Hemoglobin", proteins)
+get_molecular_weight_kDa("Insulin",    proteins)
+get_molecular_weight_kDa("Keratin",    proteins)
+```
+
+---
+
+# Function Design Best Practices
+
+| Principle | Recommendation |
+|---|---|
+| **Single responsibility** | Each function should do exactly one thing |
+| **Descriptive names** | `calculate_gc_content()` not `f1()` |
+| **Default arguments** | Provide sensible defaults for optional parameters |
+| **Validate inputs** | Check types and ranges at the start; fail early with clear messages |
+| **Use `return()` explicitly** | Makes the output obvious, even if implicit return works |
+| **Avoid `<<-`** | Prefer passing data in and returning results out |
+| **Document** | Add a comment above the function explaining what it does, its inputs, and its output |
+| **Keep it short** | If a function is longer than ~20 lines, consider splitting it |
+
+---
+
+# Quick Reference
+
+## Function Anatomy
+
+```r
+my_function <- function(x, y = 10, ...) {
+  # local variable — invisible outside
+  result <- x + y
+  return(result)
+}
+```
+
+## Calling Styles
+
+```r
+my_function(5)           # positional: x = 5, y uses default 10
+my_function(5, 20)       # positional: x = 5, y = 20
+my_function(x = 5, y = 20)  # named — order doesn't matter
+my_function(y = 20, x = 5)  # same result
+```
+
+## Apply Family
+
+| Function | Input | Output | Typical use |
+|---|---|---|---|
+| `lapply(X, FUN)` | list/vector | list | Apply to each element |
+| `sapply(X, FUN)` | list/vector | vector/matrix | Like `lapply` but simplified |
+| `apply(X, MARGIN, FUN)` | matrix | vector | Row (1) or column (2) operation |
+| `do.call(FUN, args)` | function + list | anything | Call function with a list of args |
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Write a function `celsius_to_fahrenheit(temp_c)` that converts Celsius to Fahrenheit (formula: `F = C * 9/5 + 32`). Add a second function `fahrenheit_to_celsius(temp_f)`. Test both with at least three values.
+
+**Exercise 2.** Write a function `describe_vector(v)` that prints the mean, median, standard deviation, minimum, maximum, and number of NAs of any numeric vector. Handle the case where the vector is entirely NA.
+
+**Exercise 3.** Write a function `count_nucleotide(sequence, nucleotide)` that takes a DNA string (e.g. `"ATGCGATC"`) and a nucleotide character (e.g. `"G"`) and returns the count of that nucleotide. Make the nucleotide argument default to `"G"`. Use it with `sapply()` to count all four nucleotides at once.
+
+**Exercise 4.** Write a recursive function `fibonacci(n)` that returns the nth Fibonacci number (F(1) = 1, F(2) = 1, F(n) = F(n-1) + F(n-2)). Compute the first 10 Fibonacci numbers using `sapply()`.
+
+**Exercise 5.** Write a function `summarise_group(df, group_col, value_col)` that takes a data frame and two column names (as strings), groups by `group_col`, and returns the mean and count of `value_col` per group. Use it on the built-in `InsectSprays` dataset with `group_col = "spray"` and `value_col = "count"`.
+
+**Exercise 6.** Write a function `is_palindrome(sequence)` that checks whether a DNA sequence reads the same forwards and backwards (e.g. `"ATGGTA"` is NOT a palindrome, but `"GCATCATG"` is). Return `TRUE` or `FALSE`. Test it on at least four sequences.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Functions in R*

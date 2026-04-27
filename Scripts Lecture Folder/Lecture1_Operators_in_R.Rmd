@@ -1,0 +1,388 @@
+---
+title: "Operators in R"
+subtitle: "A Comprehensive Lecture for Beginners"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "##")
+```
+
+---
+
+# Introduction
+
+In R, **operators** are special symbols or keywords used to perform operations on values and variables. They are the fundamental building blocks of any R program — you use them constantly, whether you are doing a simple calculation, comparing values, or filtering data.
+
+In this lecture, we will cover the four main families of operators in R:
+
+1. **Assignment operators** — to store values in variables
+2. **Arithmetic operators** — to do mathematical calculations
+3. **Relational (comparison) operators** — to compare values
+4. **Logical operators** — to combine conditions and work with Boolean values
+
+We will also explore how operators interact with **vectors**, and introduce two very useful tools: **Boolean selection** and the **`ifelse()` function**.
+
+> 💡 **Good practice:** Before starting a new session or tutorial, clean your Global Environment to avoid clutter:
+> ```r
+> rm(list = ls())
+> ```
+
+---
+
+# Assignment Operators
+
+Before we can use operators in any meaningful way, we need to be able to store values. In R, this is done with **assignment operators**.
+
+R offers three equivalent ways to assign a value to a variable:
+
+| Operator | Direction | Example |
+|----------|-----------|---------|
+| `<-` | Left arrow (recommended) | `x <- 10` |
+| `=` | Equals sign | `x = 10` |
+| `->` | Right arrow | `10 -> x` |
+
+When using the arrow, make sure it points **from the value toward the variable**.
+
+```{r assignment_operators}
+# Using the left arrow (most common and recommended)
+a <- 12
+
+# Using the equals sign
+b = "magician"
+
+# Using the right arrow (value on the left, variable on the right)
+32 + 19 -> c
+
+# Display the variables
+a
+b
+c
+```
+
+> ⚠️ **Important:** When you assign a new value to an existing variable, the old value is **permanently overwritten**.
+
+```{r overwrite_variable}
+a         # current value: 12
+a <- 52344
+a         # new value: 52344
+```
+
+---
+
+# Arithmetic Operators
+
+Arithmetic operators perform mathematical computations. R can be used just like a calculator.
+
+| Operator | Operation | Example | Result |
+|----------|-----------|---------|--------|
+| `+` | Addition | `5 + 3` | `8` |
+| `-` | Subtraction | `5 - 3` | `2` |
+| `*` | Multiplication | `5 * 3` | `15` |
+| `/` | Division | `5 / 2` | `2.5` |
+| `^` | Exponentiation (power) | `2 ^ 3` | `8` |
+| `%%` | Modulo (remainder) | `10 %% 6` | `4` |
+| `%/%` | Integer division | `10 %/% 6` | `1` |
+
+> 💡 **The modulo `%%`** returns the **remainder** of a division. For example, `10 %% 6 = 4` because 6 goes into 10 once, leaving a remainder of 4.
+
+```{r arithmetic_operators}
+# Basic arithmetic
+2 + 2       # Addition
+10 - 4      # Subtraction
+3 * 7       # Multiplication
+10 / 4      # Division
+2 ^ 8       # Exponentiation (2 to the power of 8)
+
+# Integer division and modulo (Euclidean division)
+10 %/% 6    # Quotient: how many times 6 fits in 10
+10 %% 6     # Remainder: what is left over
+```
+
+## Arithmetic with Variables
+
+You can perform arithmetic directly on variables:
+
+```{r arithmetic_with_variables}
+a <- 2
+b <- 4
+
+a + b   # sum
+a - b   # difference
+a * b   # product
+a / b   # division
+a ^ b   # a raised to the power of b
+```
+
+## Arithmetic with Vectors
+
+Operators in R are **vectorized**, meaning they apply element-by-element when used with vectors.
+
+```{r arithmetic_vectors}
+v1 <- c(3, 54, 1, 8, 10)
+
+v1 * 3    # Multiply every element by 3
+v1 - 5    # Subtract 5 from every element
+```
+
+When performing operations between two vectors, the lengths must be **compatible** (one must be a divisor of the other):
+
+```{r vector_arithmetic}
+v0 <- c(1, 2, 3, 4, 5)   # length 5
+v4 <- c(1, 0)              # length 2 — a divisor of 10, but not of 5
+v5 <- c(1, 1, 1, 1)       # length 4
+
+# This works: v0 (length 5) and v4 (length 2) — 
+# R will recycle v4, but with a warning since 5 is not a multiple of 2
+v4 + v0
+
+# This does NOT work: length 4 and length 5 have no common divisor
+# v5 + v0  # would produce a warning
+```
+
+---
+
+# Relational (Comparison) Operators
+
+Relational operators compare two values and return a **Boolean** result: either `TRUE` or `FALSE`.
+
+| Operator | Meaning | Example | Result |
+|----------|---------|---------|--------|
+| `<` | Less than | `2 < 3` | `TRUE` |
+| `>` | Greater than | `2 > 3` | `FALSE` |
+| `<=` | Less than or equal to | `3 <= 3` | `TRUE` |
+| `>=` | Greater than or equal to | `5 >= 6` | `FALSE` |
+| `==` | Equal to | `4 == 4` | `TRUE` |
+| `!=` | Not equal to | `4 != 5` | `TRUE` |
+
+```{r relational_operators}
+2 > 3     # Is 2 greater than 3? FALSE
+1 < 100   # Is 1 less than 100? TRUE
+5 == 5    # Is 5 equal to 5? TRUE
+5 != 3    # Is 5 different from 3? TRUE
+4 >= 4    # Is 4 greater than or equal to 4? TRUE
+3 <= 2    # Is 3 less than or equal to 2? FALSE
+```
+
+> ⚠️ **Common mistake:** Do not confuse `=` (assignment) with `==` (equality test). Use `==` to compare two values.
+
+## Relational Operators on Vectors
+
+When applied to a vector, relational operators return a **vector of Booleans**, one for each element:
+
+```{r relational_on_vectors}
+v0 <- 1:10
+v0
+
+v0 > 5    # Which elements are strictly greater than 5?
+```
+
+Notice that `5` itself returns `FALSE` because `>` is **strict** (not ≥). To include 5, use `>=`.
+
+---
+
+# Logical Operators
+
+Logical operators work with Boolean values (`TRUE` / `FALSE`) to combine or negate conditions.
+
+| Operator | Meaning | Notes |
+|----------|---------|-------|
+| `!` | NOT (negation) | Inverts TRUE to FALSE and vice versa |
+| `&` | AND (element-wise) | Use with vectors |
+| `&&` | AND (single value) | Use with scalars only |
+| `\|` | OR (element-wise) | Use with vectors |
+| `\|\|` | OR (single value) | Use with scalars only |
+
+```{r logical_operators}
+# Is 10 AND 5 both greater than 3?
+10 & 5 > 3    # TRUE — both conditions are met
+
+# Is 10 AND 1 both greater than 3?
+10 & 1 > 3    # FALSE — 1 is not greater than 3
+
+# Is 10 OR 1 greater than 3?
+10 | 1 > 3    # TRUE — at least one condition is met
+```
+
+> 💡 **Tip:** Use `&` and `|` when working with **vectors** (element-by-element). Use `&&` and `||` only for single scalar comparisons (e.g., inside `if` statements).
+
+---
+
+# Booleans in R
+
+A **Boolean** (or logical) value is a special data type in R that can only be `TRUE` or `FALSE`. These are written in **uppercase**.
+
+```{r booleans_intro}
+TRUE
+FALSE
+```
+
+## Booleans as Numbers
+
+Booleans can be treated as numbers: `TRUE` equals `1` and `FALSE` equals `0`. This makes them very useful for counting and arithmetic.
+
+```{r booleans_as_numbers}
+as.numeric(TRUE)   # returns 1
+as.numeric(FALSE)  # returns 0
+
+TRUE + TRUE        # 1 + 1 = 2
+FALSE - 10         # 0 - 10 = -10
+```
+
+## Boolean Selection in Vectors
+
+One of the most powerful uses of Booleans is **indexing**: you can use a logical vector to select elements from another vector. Elements corresponding to `TRUE` are kept; those corresponding to `FALSE` are dropped.
+
+```{r boolean_selection}
+v2 <- c(10, 20)
+v2
+
+v2[c(TRUE, FALSE)]   # Keep only the first element
+v2[c(FALSE, TRUE)]   # Keep only the second element
+v2[c(FALSE, FALSE)]  # Keep nothing (empty result)
+v2[c(TRUE, TRUE)]    # Keep everything
+```
+
+---
+
+# Logical Selection in Vectors
+
+Combining **relational operators** with **Boolean indexing** is the core of data filtering in R. The idea is simple:
+
+1. Apply a condition to a vector → get a Boolean vector
+2. Use that Boolean vector to select elements
+
+```{r logical_selection}
+v3 <- 1:10
+v4 <- c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
+
+# Step 1: Generate the Boolean vector
+v3 >= 5
+
+# Step 2: Use it to filter the numeric vector
+v3[v3 >= 5]
+
+# Step 3: Use the same Boolean to filter a character vector of the same length
+v4[v3 >= 5]
+
+# Step 4: Combine conditions with OR
+v4[v3 >= 5 | v4 == "b"]   # Keep elements where v3 >= 5 OR the letter is "b"
+```
+
+## The `%in%` Operator
+
+The `%in%` operator checks whether each element of a vector **belongs to** a specified set of values. It returns a Boolean vector.
+
+```{r in_operator}
+v3 <- 1:10
+v4 <- 1:4
+
+# Is 5 in v3?
+5 %in% v3    # TRUE — 5 is in 1:10
+
+# Is 5 in v4?
+5 %in% v4    # FALSE — v4 only goes up to 4
+
+# Which elements of v3 are also in v4?
+v3 %in% v4
+```
+
+---
+
+# The `ifelse()` Function
+
+The `ifelse()` function applies a conditional transformation to a vector. It works element-by-element and takes three arguments:
+
+```
+ifelse(condition, value_if_TRUE, value_if_FALSE)
+```
+
+```{r ifelse_function}
+v3 <- 1:10
+v3
+
+# Replace the value 10 with "equal to 10", otherwise "not equal to 10"
+ifelse(v3 == 10, "equal to 10", "not equal to 10")
+
+# Numeric transformation: multiply by 10 if less than 10, otherwise divide by 2
+ifelse(v3 < 10, v3 * 10, v3 / 2)
+```
+
+This is extremely useful for creating derived variables or recoding data — and it will be even more powerful once you are comfortable with data frames.
+
+---
+
+# The Assignment Operator in Context
+
+To complete the picture of operators, it is worth noting the **colon operator `:`**, which generates integer sequences. Although it is not usually listed alongside arithmetic operators, it behaves like one.
+
+```{r colon_operator}
+1:10        # Sequence from 1 to 10
+5:-2        # Descending sequence from 5 to -2
+```
+
+For more flexible sequences, use `seq()`:
+
+```{r seq_function}
+seq(3, 11, by = 4)       # From 3 to 11, step 4
+seq(23, 9, by = -5)      # Descending, step -5
+seq(from = 1, to = 10, by = 1)  # Full explicit version
+```
+
+---
+
+# Summary Table
+
+Here is a complete summary of all operators covered in this lecture:
+
+| Family | Operator | Meaning |
+|--------|----------|---------|
+| **Assignment** | `<-`, `=`, `->` | Store a value in a variable |
+| **Arithmetic** | `+`, `-`, `*`, `/` | Basic math |
+| **Arithmetic** | `^` | Exponentiation |
+| **Arithmetic** | `%%` | Modulo (remainder) |
+| **Arithmetic** | `%/%` | Integer division |
+| **Relational** | `<`, `>` | Strictly less/greater than |
+| **Relational** | `<=`, `>=` | Less/greater than or equal |
+| **Relational** | `==` | Equal to |
+| **Relational** | `!=` | Not equal to |
+| **Logical** | `!` | NOT (negation) |
+| **Logical** | `&`, `&&` | AND |
+| **Logical** | `\|`, `\|\|` | OR |
+| **Membership** | `%in%` | Element belongs to a set |
+| **Sequence** | `:` | Integer sequence |
+
+---
+
+# Practice Exercises
+
+Test your understanding with these exercises. Try them in your R console before looking at the solutions.
+
+**Exercise 1.** Create two variables `x <- 7` and `y <- 3`. Compute their sum, difference, product, and the remainder when `x` is divided by `y`.
+
+**Exercise 2.** Create a vector `scores <- c(45, 78, 92, 33, 67, 88, 55)`. Use a relational operator to extract only the scores that are strictly greater than 60.
+
+**Exercise 3.** Using the same `scores` vector, use `ifelse()` to create a new vector where scores above 60 are labeled `"pass"` and scores 60 or below are labeled `"fail"`.
+
+**Exercise 4.** Create a vector `fruits <- c("apple", "banana", "mango", "papaya", "kiwi")`. Use `%in%` to check which fruits are in the list `c("banana", "kiwi", "grape")`.
+
+**Exercise 5.** What is the difference between `&` and `&&`? In what situation would you use each?
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Operators in R*

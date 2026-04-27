@@ -1,0 +1,311 @@
+---
+title: "Les Packages dans R : Installation, Chargement et Gestion"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      eval = FALSE, 
+                      message = FALSE, 
+                      warning = FALSE)
+```
+
+---
+
+# Introduction : Qu'est-ce qu'un package ?
+
+Un **package** dans R est une collection de **fonctions**, de **données** et de **documentation** regroupées pour étendre les capacités de base de R.
+
+> 💡 **Analogie utile :** Pensez à R comme un smartphone. Les packages sont des applications que vous installez pour ajouter de nouvelles fonctionnalités.
+
+La distinction essentielle à retenir :
+
+- **Package** → l'ensemble des outils (fonctions + données)
+- **Library** → l'endroit sur votre ordinateur où le package est stocké
+
+```{r concept}
+# Voir le répertoire où R stocke vos packages (votre "bibliothèque")
+.libPaths()
+```
+
+---
+
+# Installer des packages
+
+## Installer un seul package
+
+La fonction `install.packages()` télécharge et installe un package depuis le dépôt officiel CRAN.
+
+```{r install-one}
+install.packages("ggplot2")
+```
+
+> ⚠️ **Important :** L'installation ne se fait qu'**une seule fois**. Le package reste disponible sur votre machine jusqu'à ce que vous le supprimiez manuellement.
+
+## Installer plusieurs packages à la fois
+
+Vous pouvez passer un vecteur de noms de packages pour tout installer en une seule commande :
+
+```{r install-multiple}
+install.packages(c("dplyr", "devtools", "foreign"))
+```
+
+Voici quelques packages fréquemment utilisés en recherche et analyse de données :
+
+```{r install-research}
+packages <- c(
+  # Statistiques générales
+  "pwr",           # Calcul de puissance statistique
+  "nortest",       # Tests de normalité (Anderson-Darling, Lilliefors)
+  "car",           # Test de Levene, ANOVA robuste
+
+  # Taille d'effet
+  "effsize",       # d de Cohen, epsilon²
+  "effectsize",    # η², ω², V de Cramér
+  "rstatix",       # Interface tidyverse pour tests statistiques
+
+  # Tests non paramétriques
+  "FSA",           # Test de Dunn (post-hoc Kruskal-Wallis)
+
+  # Régression et épidémiologie
+  "broom",         # Résultats de modèles en data frame
+  "pROC",          # Courbe ROC et AUC
+  "epiR",          # Mesures épidémiologiques (OR, RR, PAR)
+
+  # Visualisation
+  "ggplot2",       # Graphiques de qualité publication
+  "ggpubr",        # Graphiques avec annotations statistiques
+  "corrplot",      # Matrices de corrélation visuelles
+
+  # Gestion des données
+  "dplyr",         # Manipulation de données
+  "tidyr"          # Restructuration de données (format long/wide)
+)
+
+# Installation en une ligne
+install.packages(packages)
+```
+
+## Installer depuis RStudio (sans code)
+
+Il est également possible d'installer des packages via l'interface graphique :
+
+- **RStudio** → Menu `Tools` → `Install Packages`
+- **RGui** → Menu `Packages` → `Install package(s)`
+
+---
+
+# Charger (appeler) un package
+
+## La fonction `library()`
+
+Installer un package ne suffit pas : vous devez le **charger en mémoire** à chaque nouvelle session R avant de pouvoir l'utiliser.
+
+```{r load}
+library(ggplot2)   # Charge ggplot2 dans la session courante
+library(dplyr)     # Charge dplyr
+```
+
+> 🔄 **À retenir :** Vous installez un package **une fois**, mais vous le chargez **à chaque nouvelle session R**.
+
+## Charger plusieurs packages automatiquement
+
+Pour charger une liste de packages en une seule instruction :
+
+```{r load-multiple}
+# Chargement silencieux de tous les packages d'un vecteur
+invisible(lapply(packages, library, character.only = TRUE))
+```
+
+## Utiliser une fonction sans charger le package
+
+Il est possible d'appeler une fonction d'un package sans charger toute la bibliothèque, en utilisant l'opérateur `::` :
+
+```{r double-colon}
+# Syntaxe : package::fonction()
+ggpage::ggpage_quick(ggpage::tinderbox)
+
+# Utile pour éviter les conflits de noms entre packages
+dplyr::select(mtcars, mpg, cyl)
+```
+
+> 💡 **Avantage :** Cette syntaxe précise explicitement d'où vient la fonction, ce qui évite les conflits quand deux packages ont des fonctions du même nom.
+
+## Explorer le contenu d'un package
+
+```{r explore}
+# Lister toutes les fonctions d'un package chargé
+ls("package:ggplot2")
+
+# Accéder à l'aide complète d'un package
+help(package = "dplyr")
+```
+
+---
+
+# Obtenir de l'aide sur un package ou une fonction
+
+```{r help}
+# Aide sur une fonction spécifique
+?sum
+help(mean)
+
+# Aide sur un package entier
+help(package = "dplyr")
+
+# Aide sur les expressions régulières (utile pour grep, grepl, etc.)
+?regex
+```
+
+---
+
+# Mettre à jour et supprimer des packages
+
+## Vérifier les packages obsolètes
+
+```{r check-old}
+# Lister les packages qui ont une version plus récente disponible
+old.packages()
+```
+
+## Mettre à jour les packages
+
+```{r update}
+# Mettre à jour tous les packages installés
+update.packages()
+
+# Mettre à jour un package spécifique (re-installer simplement)
+install.packages("ggplot2")
+```
+
+## Supprimer un package
+
+```{r remove}
+# Supprimer un package de votre système
+remove.packages("ggplot2")
+```
+
+---
+
+# Vérifier l'état de la session
+
+Après avoir chargé vos packages, il est utile de vérifier votre environnement de travail :
+
+```{r session}
+# Informations complètes sur la session : version R + packages chargés
+sessionInfo()
+```
+
+Cette commande affiche :
+- La version de R utilisée
+- Le système d'exploitation
+- La liste de tous les packages chargés et leurs versions
+
+---
+
+# Packages essentiels par domaine
+
+## Visualisation
+
+| Package     | Utilisation principale                                    |
+|-------------|-----------------------------------------------------------|
+| `ggplot2`   | Graphiques de qualité publication (grammaire des graphiques) |
+| `ggpubr`    | Graphiques prêts à publier avec annotations statistiques  |
+| `corrplot`  | Matrices de corrélation visuelles                         |
+| `GGally`    | Analyse exploratoire visuelle (extension de ggplot2)      |
+| `patchwork` | Combiner plusieurs graphiques ggplot2 en un seul          |
+
+## Manipulation des données
+
+| Package  | Utilisation principale                          |
+|----------|-------------------------------------------------|
+| `dplyr`  | Filtrer, trier, résumer, transformer des données |
+| `tidyr`  | Restructurer les données (format long ↔ wide)   |
+| `haven`  | Importer des fichiers `.dta` (Stata), SPSS, SAS |
+
+## Statistiques et épidémiologie
+
+| Package            | Utilisation principale                           |
+|--------------------|--------------------------------------------------|
+| `rstatix`          | Tests statistiques dans le style tidyverse       |
+| `effectsize`       | Calcul des tailles d'effet (η², ω², V de Cramér) |
+| `pROC`             | Courbes ROC et AUC                               |
+| `epiR`             | Odds ratios, risques relatifs, PAR               |
+
+## Analyse exploratoire
+
+| Package        | Utilisation principale                                      |
+|----------------|-------------------------------------------------------------|
+| `skimr`        | Résumé enrichi des données                                  |
+| `DataExplorer` | Rapport automatique d'exploration                           |
+| `dlookr`       | Diagnostic, valeurs aberrantes, rapport web interactif      |
+
+---
+
+# Exemple pratique : Chargement et utilisation
+
+Voici un exemple complet intégrant l'installation, le chargement et l'utilisation de packages pour une analyse simple :
+
+```{r exemple-complet}
+# Étape 1 : Installer les packages nécessaires (une seule fois)
+install.packages(c("dplyr", "ggplot2"))
+
+# Étape 2 : Charger les packages (à chaque session)
+library(dplyr)
+library(ggplot2)
+
+# Étape 3 : Utiliser les fonctions des packages chargés
+# Filtrer les données intégrées à R (airquality)
+donnees_ete <- airquality %>%
+  filter(Month %in% c(7, 8)) %>%          # Juillet et Août
+  select(Ozone, Temp, Wind, Month) %>%    # Sélectionner les colonnes
+  na.omit()                               # Retirer les valeurs manquantes
+
+# Vérifier le résultat
+head(donnees_ete)
+summary(donnees_ete)
+
+# Étape 4 : Visualiser avec ggplot2
+ggplot(donnees_ete, aes(x = Temp, y = Ozone)) +
+  geom_point(color = "steelblue", alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "tomato") +
+  labs(
+    title = "Relation entre Température et Ozone",
+    subtitle = "Données de qualité de l'air — Été 1973",
+    x = "Température (°F)",
+    y = "Ozone (ppb)"
+  ) +
+  theme_minimal()
+```
+
+---
+
+# Résumé des fonctions clés
+
+| Fonction                  | Rôle                                              |
+|---------------------------|---------------------------------------------------|
+| `install.packages("x")`   | Installer le package `x` depuis CRAN              |
+| `library(x)`              | Charger le package `x` dans la session courante   |
+| `package::fonction()`     | Utiliser une fonction sans charger le package     |
+| `help(package = "x")`     | Afficher l'aide d'un package                      |
+| `ls("package:x")`         | Lister les fonctions disponibles dans un package  |
+| `old.packages()`          | Lister les packages nécessitant une mise à jour   |
+| `update.packages()`       | Mettre à jour tous les packages installés         |
+| `remove.packages("x")`    | Désinstaller le package `x`                       |
+| `sessionInfo()`           | Afficher les informations sur la session R        |
+
+---
+
+> 📌 **Bonnes pratiques :**  
+> 1. Placez tous vos `library()` en **début de script**, pour que les dépendances soient claires.  
+> 2. Utilisez `package::fonction()` en cas de **conflit de noms** entre packages.  
+> 3. Consultez régulièrement `sessionInfo()` pour assurer la **reproductibilité** de vos analyses.

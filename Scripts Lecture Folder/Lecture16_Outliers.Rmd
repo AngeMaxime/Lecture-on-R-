@@ -1,0 +1,427 @@
+---
+title: "Lecture 4: Identifying and Handling Outliers in Exploratory Data Analysis"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 8,
+  fig.height = 5
+)
+```
+
+---
+
+# Learning Objectives
+
+By the end of this lecture, you will be able to:
+
+- Define what an **outlier** is and why identifying outliers matters
+- Use **visual methods** (boxplots, histograms, scatter plots) to spot outliers
+- Apply the **Grubbs test** to formally identify outliers in a univariate dataset
+- Write a **custom R function** that iteratively flags multiple outliers
+- Visualise outlier positions within a histogram using `ggplot2`
+- Make informed decisions about what to **do** with identified outliers
+
+---
+
+# What is an Outlier?
+
+An **outlier** is an observation that lies an abnormal distance from the other observations in a dataset. Outliers can arise from:
+
+- **Data entry errors** (e.g., a weight recorded as 580 kg instead of 58 kg)
+- **Measurement errors** (malfunctioning sensor, instrument drift)
+- **Genuine extreme biological or physical events** (rare but real)
+
+> **Why does it matter?** Outliers can heavily distort the mean, inflate standard deviation, bias regression coefficients, and violate model assumptions.
+
+## A Conceptual Example
+
+```{r toy-example}
+x <- c(12, 14, 13, 15, 14, 13, 12, 14, 99)
+
+cat("Mean without outlier:", mean(x[-9]), "\n")
+cat("Mean with outlier:   ", mean(x),     "\n")
+cat("SD without outlier:", round(sd(x[-9]), 2), "\n")
+cat("SD with outlier:   ", round(sd(x),    2), "\n")
+```
+
+> A single extreme value (99) more than **doubles** the standard deviation and shifts the mean by nearly 10 units.
+
+---
+
+# Required Packages
+
+```{r load-packages}
+# Install the outliers package if needed:
+# install.packages("outliers")
+
+library(outliers)   # Statistical outlier tests (Grubbs, Dixon, etc.)
+library(ggplot2)    # Data visualisation
+```
+
+---
+
+# Visual Detection of Outliers
+
+Before applying any statistical test, always **look at your data**. Visualisation is the first and most intuitive step.
+
+## Working with the `airquality` Dataset
+
+R's built-in `airquality` dataset records daily air quality measurements in New York (May–September 1973). It contains variables: `Ozone`, `Solar.R`, `Wind`, `Temp`, `Month`, `Day`.
+
+```{r airquality-preview}
+head(airquality)
+summary(airquality)
+```
+
+## Boxplot
+
+Boxplots show the IQR and flag points beyond 1.5×IQR as potential outliers:
+
+```{r boxplot-ozone}
+ggplot(airquality, aes(y = Ozone)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.7, outlier.color = "red", outlier.size = 3) +
+  labs(
+    title   = "Distribution of Ozone levels — New York 1973",
+    subtitle = "Red points are flagged as potential outliers by the IQR rule",
+    y       = "Ozone (ppb)"
+  ) +
+  theme_minimal()
+```
+
+## Histogram
+
+A histogram reveals the shape of the distribution and shows isolated bars at extreme values:
+
+```{r histogram-ozone}
+ggplot(airquality, aes(x = Ozone)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "white", alpha = 0.8) +
+  labs(
+    title = "Histogram of Ozone — New York 1973",
+    x     = "Ozone (ppb)",
+    y     = "Count"
+  ) +
+  theme_minimal()
+```
+
+## Scatter Plot (Two Variables)
+
+For bivariate outliers, a scatter plot is the most effective tool:
+
+```{r scatter-wind-temp}
+ggplot(airquality, aes(x = Wind, y = Temp)) +
+  geom_point(color = "steelblue", alpha = 0.7, size = 2.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "red", linetype = "dashed") +
+  labs(
+    title   = "Wind speed vs Temperature — New York 1973",
+    subtitle = "Points far from the regression line may be bivariate outliers",
+    x       = "Wind speed (mph)",
+    y       = "Temperature (°F)"
+  ) +
+  theme_minimal()
+```
+
+---
+
+# The IQR Rule for Outlier Detection
+
+The **Interquartile Range (IQR) rule** is the most common classical method. A value is flagged as an outlier if it falls outside:
+
+$$\text{Lower fence} = Q_1 - 1.5 \times IQR$$
+$$\text{Upper fence} = Q_3 + 1.5 \times IQR$$
+
+```{r iqr-rule}
+ozone_clean <- airquality$Ozone[!is.na(airquality$Ozone)]
+
+Q1  <- quantile(ozone_clean, 0.25)
+Q3  <- quantile(ozone_clean, 0.75)
+IQR_val <- IQR(ozone_clean)
+
+lower_fence <- Q1 - 1.5 * IQR_val
+upper_fence <- Q3 + 1.5 * IQR_val
+
+cat("Q1 =", Q1, "\n")
+cat("Q3 =", Q3, "\n")
+cat("IQR =", IQR_val, "\n")
+cat("Lower fence:", lower_fence, "\n")
+cat("Upper fence:", upper_fence, "\n")
+
+# Identify outlier values
+outlier_values <- ozone_clean[ozone_clean < lower_fence | ozone_clean > upper_fence]
+cat("Outlier values (IQR rule):", outlier_values, "\n")
+```
+
+---
+
+# The Grubbs Test for Formal Outlier Detection
+
+## What is the Grubbs Test?
+
+The **Grubbs test** (also called the Extreme Studentized Deviate test) is a formal statistical test for identifying a **single outlier** in a univariate dataset that is assumed to follow a **normal distribution**.
+
+**Hypotheses:**
+
+- $H_0$: There are **no outliers** in the dataset
+- $H_1$: There is **exactly one outlier** (the most extreme value)
+
+**Test statistic:**
+
+$$G = \frac{\max|x_i - \bar{x}|}{s}$$
+
+where $\bar{x}$ is the sample mean and $s$ is the sample standard deviation.
+
+If the p-value < 0.05, we reject $H_0$ and conclude that the most extreme value is an outlier.
+
+## Applying a Single Grubbs Test
+
+```{r single-grubbs}
+ozone_clean <- airquality$Ozone[!is.na(airquality$Ozone)]
+
+grubbs_result <- grubbs.test(ozone_clean)
+print(grubbs_result)
+```
+
+**Interpretation:** If `p < 0.05`, the most extreme value (identified in the `alternative` field) is a statistically significant outlier.
+
+---
+
+# Writing a Custom Iterative Outlier Detection Function
+
+The standard `grubbs.test()` identifies only **one outlier at a time**. To find **all outliers** in a dataset, we apply the test iteratively — removing each identified outlier and repeating until no more outliers are found.
+
+```{r grubbs-flag-function}
+grubbs.flag <- function(x) {
+  
+  # Initialise an empty vector to collect all identified outliers
+  outliers <- NULL
+  
+  # Work on a copy of the data
+  test <- x
+  
+  # Run the first Grubbs test
+  grubbs_result <- grubbs.test(test)
+  pv <- grubbs_result$p.value
+  
+  # Iteratively identify and remove outliers while p < 0.05
+  while (pv < 0.05) {
+    
+    # Extract the outlier value from the alternative hypothesis text
+    outlier_val <- as.numeric(
+      strsplit(grubbs_result$alternative, " ")[[1]][3]
+    )
+    
+    # Add this outlier to our collection
+    outliers <- c(outliers, outlier_val)
+    
+    # Remove the identified outlier from the test vector
+    test <- x[!x %in% outliers]
+    
+    # Re-run the Grubbs test on the cleaned vector
+    grubbs_result <- grubbs.test(test)
+    pv <- grubbs_result$p.value
+  }
+  
+  # Return a data frame with the original values and a logical outlier flag
+  return(data.frame(
+    X        = x,
+    outlier  = (x %in% outliers)
+  ))
+}
+```
+
+**Let's walk through this function step by step:**
+
+| Line | What it does |
+|---|---|
+| `outliers <- NULL` | Creates an empty container for identified outliers |
+| `grubbs.test(test)` | Runs the Grubbs test on the current data |
+| `while (pv < 0.05)` | Keeps looping as long as outliers are found |
+| `strsplit(...)` | Parses the outlier value from the test result text |
+| `test <- x[!x %in% outliers]` | Removes all identified outliers before re-testing |
+| `return(data.frame(...))` | Returns the original data with a TRUE/FALSE outlier column |
+
+---
+
+# Applying the Function to Real Data
+
+## Using the UCI Air Quality Dataset
+
+```{r load-airdata, eval=FALSE}
+# If you have the UCI Air Quality Excel file:
+# library(readxl)
+# Air_data <- read_xlsx("AirqualityUCI.xlsx")
+```
+
+For demonstration, we use the built-in `airquality` dataset (a standard R dataset with similar variables):
+
+```{r apply-grubbs}
+# Use Ozone variable from built-in airquality (remove NAs first)
+ozone_vals <- airquality$Ozone[!is.na(airquality$Ozone)]
+
+# Apply the custom function
+result_df <- grubbs.flag(ozone_vals)
+
+# View the identified outliers
+cat("Total observations:", nrow(result_df), "\n")
+cat("Outliers detected:", sum(result_df$outlier), "\n")
+cat("Outlier values:", result_df$X[result_df$outlier], "\n")
+```
+
+---
+
+# Visualising Outliers in a Histogram
+
+The key advantage of the `grubbs.flag()` function is that it returns a data frame with a logical `outlier` column, which we can map directly to colour in `ggplot2`:
+
+```{r histogram-outliers}
+ggplot(result_df,
+       aes(x     = X,
+           color = outlier,
+           fill  = outlier)) +
+  geom_histogram(
+    binwidth = diff(range(result_df$X)) / 30,
+    alpha    = 0.7
+  ) +
+  scale_fill_manual(
+    values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
+    labels = c("Normal", "Outlier")
+  ) +
+  scale_color_manual(
+    values = c("FALSE" = "steelblue", "TRUE" = "firebrick"),
+    labels = c("Normal", "Outlier")
+  ) +
+  labs(
+    title    = "Ozone levels with Grubbs-identified outliers highlighted",
+    subtitle = "Red bars mark values statistically identified as outliers (p < 0.05)",
+    x        = "Ozone (ppb)",
+    y        = "Count",
+    fill     = "Status",
+    color    = "Status"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+---
+
+# What to Do With Outliers?
+
+Identifying outliers is only the first step. What you do next depends on the **source** and **context**:
+
+## Decision Framework
+
+```
+Outlier detected
+      |
+      ├─── Is it a data entry / recording error?
+      │         YES → Correct or remove it
+      │
+      ├─── Is it a genuine extreme value?
+      │         YES → Keep it; report it; consider robust methods
+      │
+      ├─── Is it due to a different sub-population?
+      │         YES → Stratify your analysis
+      │
+      └─── Are you unsure?
+                → Run analysis both with and without; report both results
+```
+
+## Practical Options
+
+| Approach | When to use |
+|---|---|
+| **Remove** | Confirmed data entry errors |
+| **Keep but report** | Genuine rare events |
+| **Winsorize** | Replace with the nearest non-outlier value |
+| **Robust statistics** | Use median, IQR, or robust regression instead of mean/OLS |
+| **Log-transform** | When data are right-skewed with extreme values |
+
+## Winsorization Example
+
+```{r winsorize}
+# Winsorize at the 5th and 95th percentile
+lower_p <- quantile(ozone_vals, 0.05)
+upper_p <- quantile(ozone_vals, 0.95)
+
+ozone_winsorized <- pmin(pmax(ozone_vals, lower_p), upper_p)
+
+cat("Original max:", max(ozone_vals), "\n")
+cat("Winsorized max:", max(ozone_winsorized), "\n")
+```
+
+---
+
+# Comparing Multiple Outlier Detection Methods
+
+```{r compare-methods}
+# Z-score method (flag values with |z| > 3)
+z_scores <- scale(ozone_vals)
+zscore_outliers <- abs(z_scores) > 3
+
+# IQR method
+iqr_outliers <- ozone_vals < lower_fence | ozone_vals > upper_fence
+
+# Grubbs method (from earlier)
+grubbs_outliers <- result_df$outlier
+
+comparison <- data.frame(
+  Value   = ozone_vals,
+  Z_score = as.vector(zscore_outliers),
+  IQR     = iqr_outliers,
+  Grubbs  = grubbs_outliers
+)
+
+# Show values flagged by at least one method
+comparison[comparison$Z_score | comparison$IQR | comparison$Grubbs, ]
+```
+
+> **Key insight:** Different methods may flag different observations. When methods agree, you have stronger evidence. When they disagree, investigate further.
+
+---
+
+# Summary
+
+| Concept | Key Takeaway |
+|---|---|
+| Outlier definition | A value abnormally distant from others — may be error or genuine extreme |
+| Visual methods | Boxplot, histogram, scatter plot — always look first |
+| IQR rule | Simple, robust; flags values beyond Q1 − 1.5×IQR or Q3 + 1.5×IQR |
+| Grubbs test | Formal statistical test; assumes normality; tests one outlier at a time |
+| Iterative Grubbs | Custom function to detect all outliers; returns a flagging data frame |
+| ggplot2 visualisation | Map the outlier flag to fill/color to produce a labelled histogram |
+| What to do | Depends on source: correct errors, keep genuine extremes, use robust methods |
+
+---
+
+# Practice Exercises
+
+1. Apply `grubbs.flag()` to the `Wind` column of the `airquality` dataset. How many outliers are found? Visualise the result with a histogram.
+
+2. Compare outlier detection results for `Temp` in `airquality` using three methods: the IQR rule, the Z-score method (|z| > 3), and the Grubbs iterative function. Do the methods agree?
+
+3. Create a scatter plot of `Solar.R` vs `Ozone` from `airquality`. Colour points identified as outliers by `grubbs.flag()` on the `Ozone` axis in red. What do you observe?
+
+4. *Challenge:* Modify `grubbs.flag()` so that it tests for outliers on **both tails** and **one tail at a time** (use `two.sided = FALSE` in `grubbs.test()`). How does this affect the results?
+
+---
+
+# References
+
+- Grubbs, F. E. (1969). Procedures for detecting outlying observations in samples. *Technometrics*, 11(1), 1–21.
+- Wickham, H. & Grolemund, G. (2017). *R for Data Science*. O'Reilly Media. https://r4ds.had.co.nz
+- R `outliers` package documentation: https://cran.r-project.org/package=outliers
+- Barnett, V. & Lewis, T. (1994). *Outliers in Statistical Data* (3rd ed.). Wiley.

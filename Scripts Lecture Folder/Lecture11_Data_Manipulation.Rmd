@@ -1,0 +1,827 @@
+---
+title: "Data Manipulation in R"
+subtitle: "A Comprehensive Lecture — From Raw Data to Clean, Tidy, Analysis-Ready Tables"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r packages}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+```
+
+---
+
+# Introduction — The Seven Steps of Statistical Analysis
+
+Every rigorous data analysis follows a structured workflow. Understanding the whole pipeline helps you know *why* each manipulation step matters:
+
+| Step | Description |
+|---|---|
+| **1. Research plan** | Define your research question, hypotheses (null + alternative), and expected results |
+| **2. Data preparation** | Identify suitable data sources; import raw data into R |
+| **3. Data cleaning** | Select variables and population of interest; recode variables; handle missing values; save clean data |
+| **4. Exploratory analysis** | Explore distributions and relationships; detect anomalies; verify cleaning |
+| **5. Descriptive analysis** | Describe each variable of interest in depth (univariate + bivariate) |
+| **6. Inferential analysis** | Test hypotheses; measure strength and direction of relationships using regression models |
+| **7. Presentation** | Export tables and plots to reports or presentations |
+
+> 💡 Data cleaning (Step 3) is the most time-consuming step and directly determines the validity of everything that follows. Be patient, systematic, and leave a traceable code trail.
+
+---
+
+# Creating a Dataset to Work With
+
+We will use two datasets throughout this lecture:
+
+```{r create-datasets}
+# --- Dataset 1: Accident / driving permit data (small, illustrative) ---
+data_acc <- data.frame(
+  Prenom.Nom       = c("Udo Adesina","Flora Feijo","Svend Baardsen","Edda Franck","Yeo Ji-tae"),
+  sexe             = c("Femme","Femme","Homme","Femme","Homme"),
+  Votre.Age        = c(196, 22, 19, 18, 21),    # 196 is a data entry error
+  Permis           = c("oui","Non","Oui","Non","Non"),
+  accident.condu   = c(0.01, NA, 0.02, NA, NA),
+  accident.on.ondu = c(0.02, 0.01, NA, 0.02, NA)
+)
+
+# --- Dataset 2: Regional malaria data (analysis dataset) ---
+set.seed(123)
+regions_full <- c("Centre","Littoral","Far_North","North_West","South_West")
+months_full  <- month.abb[1:5]
+
+malaria_big <- expand.grid(region = regions_full,
+                           month  = months_full,
+                           year   = 2024)
+malaria_big$cases <- sample(100:1500, nrow(malaria_big), replace = TRUE)
+malaria_big$rain  <- sample(0:350,   nrow(malaria_big), replace = TRUE)
+
+head(data_acc)
+head(malaria_big)
+```
+
+---
+
+# Step 1 — Inspecting Raw Data
+
+Before touching anything, **understand what you have**.
+
+```{r inspect}
+# Dimensions
+dim(data_acc)
+dim(malaria_big)
+
+# Variable names and types
+str(data_acc)
+str(malaria_big)
+
+# Compact tidyverse view
+dplyr::glimpse(malaria_big)
+
+# Statistical summary
+summary(data_acc)
+summary(malaria_big)
+
+# First and last rows
+head(malaria_big)
+tail(malaria_big, 3)
+
+# Column names
+names(data_acc)
+names(malaria_big)
+```
+
+> 💡 **Always call `summary()` immediately** after loading any dataset. It reveals the range of each variable, the number of NAs, and whether numeric columns were accidentally read as characters.
+
+---
+
+# Step 2 — Cleaning Column Names
+
+Messy column names (spaces, capital letters, special characters) cause errors downstream.
+
+## Base R — `make.names()` and `tolower()`
+
+```{r clean-names-base}
+# Current names
+names(data_acc)
+
+# Make syntactically valid (replaces spaces and special chars with .)
+make.names(names(data_acc))
+
+# Lowercase all names
+names(data_acc) <- tolower(names(data_acc))
+names(data_acc)
+```
+
+## `janitor::clean_names()` — Recommended
+
+```{r clean-names-janitor}
+library(janitor)
+
+# Converts to lowercase snake_case automatically
+data_clean <- clean_names(data_acc)
+names(data_clean)
+```
+
+`clean_names()` removes spaces, replaces special characters with `_`, converts everything to lowercase, and handles duplicates — all in one call.
+
+---
+
+# Step 3 — Checking and Converting Variable Types
+
+Each variable must have the correct R type before analysis. Always verify with `class()` or `str()`.
+
+## Type Reference Table
+
+| R type | `class()` output | What it stores | Example |
+|---|---|---|---|
+| Numeric | `"numeric"` | Decimal numbers | `3.14`, `height` |
+| Integer | `"integer"` | Whole numbers | `5L`, counts |
+| Character | `"character"` | Text strings | `"Male"` |
+| Factor | `"factor"` | Categorical (unordered) | `sex`, `blood_type` |
+| Ordered factor | `"ordered" "factor"` | Categorical (ordered) | `severity`, `education` |
+| Logical | `"logical"` | TRUE/FALSE | `is_positive` |
+| Date | `"Date"` | Calendar dates | `2024-01-15` |
+
+## Checking Types
+
+```{r check-types}
+class(data_clean$votre_age)
+class(data_clean$sexe)
+is.numeric(data_clean$votre_age)
+is.character(data_clean$sexe)
+```
+
+## Converting Types — the `as.*()` Family
+
+```{r convert-types}
+# Character → Factor
+data_clean$sexe   <- as.factor(data_clean$sexe)
+data_clean$permis <- as.factor(data_clean$permis)
+
+# Character → Numeric
+x_chr <- c("3.5", "7.2", "1.1")
+as.numeric(x_chr)
+
+# Numeric → Integer
+as.integer(c(3.7, 5.9))   # truncates — does NOT round
+
+# Factor → Character
+as.character(data_clean$sexe)
+
+# Logical coercion
+as.numeric(TRUE)    # 1
+as.numeric(FALSE)   # 0
+```
+
+> ⚠️ `as.integer()` **truncates** decimals (3.7 → 3), it does not round. Use `round()` first if you need rounding.
+
+---
+
+# Step 4 — Working with Factors
+
+Factors are R's data structure for categorical variables. They are essential for statistical modelling and controlled plotting.
+
+## Creating and Inspecting Factors
+
+```{r factors-create}
+sexe_f <- factor(c("Femme","Homme","Femme","Homme","Femme"))
+sexe_f
+levels(sexe_f)   # alphabetical by default
+nlevels(sexe_f)
+table(sexe_f)    # frequency count
+```
+
+## Renaming Levels
+
+```{r factor-rename}
+# Method 1 — via labels in factor()
+factor(c("F","M","F"), labels = c("Femme","Homme"))
+
+# Method 2 — reassign levels() directly
+levels(sexe_f) <- c("Female","Male")
+sexe_f
+```
+
+## Reordering Levels
+
+```{r factor-reorder}
+# Method 1: specify order explicitly
+factor(sexe_f, levels = c("Male","Female"))
+
+# Method 2: relevel() — set the reference category (crucial for regression)
+relevel(sexe_f, ref = "Male")
+
+# Method 3: reorder() by a numeric variable (great for plots)
+taille <- c(165, 178, 162, 182, 170)
+reorder(sexe_f, taille)           # ascending
+reorder(sexe_f, taille, decreasing = TRUE)  # descending
+
+# Method 4: forcats::fct_infreq() — order by frequency
+library(forcats)
+fct_infreq(sexe_f)
+```
+
+## Ordered Factors
+
+For ordinal variables (variables with a meaningful order):
+
+```{r ordered-factor}
+severity <- factor(c("Low","High","Medium","Low","High"),
+                   levels  = c("Low","Medium","High"),
+                   ordered = TRUE)
+severity
+severity[1] < severity[3]   # TRUE — comparisons work
+```
+
+---
+
+# Step 5 — Working with Dates
+
+R's `Date` class stores calendar dates. The `lubridate` package makes date parsing effortless.
+
+```{r dates}
+library(lubridate)
+
+# Parse dates from different string formats
+ymd("2008-11-14")           # Year-Month-Day
+dmy("14.11.2008")           # Day-Month-Year
+dmy("8th of November 2008") # Natural language
+
+# Today's date
+today()
+Sys.Date()
+
+# Date arithmetic
+birth <- ymd("1990-12-25")
+age_days  <- today() - birth
+age_years <- as.numeric(age_days) / 365.25
+round(age_years, 1)
+
+# Extract components
+year(today())
+month(today())
+day(today())
+wday(today(), label = TRUE)   # day of the week
+```
+
+---
+
+# Step 6 — Selecting Variables and Filtering Rows
+
+## Base R Selection
+
+```{r base-selection}
+# Select specific columns
+malaria_big[, c("region","cases")]     # by name
+malaria_big[, c(1, 4)]                 # by position
+malaria_big[, -3]                      # all except column 3
+
+# Filter rows by condition
+malaria_big[malaria_big$cases > 1000, ]
+malaria_big[malaria_big$region == "Far_North", ]
+
+# Combined row + column selection
+malaria_big[malaria_big$cases > 500, c("region","month","cases")]
+```
+
+## `dplyr` Selection
+
+```{r dplyr-select-filter}
+library(dplyr)
+
+# select() — choose columns
+malaria_big %>% select(region, cases, rain)
+malaria_big %>% select(-year)                     # drop year
+malaria_big %>% select(starts_with("r"))          # helper functions
+
+# filter() — keep matching rows
+malaria_big %>% filter(cases > 1000)
+malaria_big %>% filter(region == "Far_North" & cases > 800)
+malaria_big %>% filter(region %in% c("Centre","Littoral"))
+malaria_big %>% filter(cases > 500 | rain < 50)
+
+# Chained: select + filter in one pipeline
+malaria_big %>%
+  select(region, month, cases) %>%
+  filter(cases > 1000) %>%
+  arrange(desc(cases))
+```
+
+### `select()` Helper Functions
+
+```{r select-helpers}
+# All columns containing "a"
+malaria_big %>% select(contains("a"))
+
+# Columns ending with "s"
+malaria_big %>% select(ends_with("s"))
+
+# Numeric columns only
+malaria_big %>% select(where(is.numeric))
+```
+
+---
+
+# Step 7 — Renaming Columns
+
+```{r rename}
+# Base R
+names(malaria_big)[names(malaria_big) == "cases"] <- "malaria_cases"
+names(malaria_big)
+
+# Restore
+names(malaria_big)[names(malaria_big) == "malaria_cases"] <- "cases"
+
+# dplyr::rename() — new_name = old_name
+malaria_big %>%
+  rename(n_cases  = cases,
+         rainfall = rain) %>%
+  head(3)
+```
+
+---
+
+# Step 8 — Creating and Modifying Columns with `mutate()`
+
+`mutate()` adds new columns or overwrites existing ones. All other columns are preserved.
+
+## Basic `mutate()`
+
+```{r mutate-basic}
+# Create a new column
+malaria_big %>%
+  mutate(cases_per_100k = cases / 10) %>%
+  head(4)
+
+# Create multiple columns at once
+malaria_big %>%
+  mutate(
+    cases_log   = log1p(cases),           # log(cases + 1)
+    high_burden = cases > 800,            # logical flag
+    .before     = cases                   # position the new cols
+  ) %>%
+  head(4)
+```
+
+## Conditional Column Creation — `ifelse()` and `case_when()`
+
+```{r mutate-conditional}
+# ifelse() — two outcomes
+malaria_big %>%
+  mutate(burden = ifelse(cases > 800, "High", "Low")) %>%
+  head(4)
+
+# case_when() — multiple outcomes (cleaner than nested ifelse)
+malaria_big %>%
+  mutate(burden = case_when(
+    cases > 1200 ~ "Very High",
+    cases > 800  ~ "High",
+    cases > 400  ~ "Moderate",
+    TRUE         ~ "Low"        # default
+  )) %>%
+  count(burden)
+```
+
+## `recode()` — Recode Values
+
+```{r recode}
+# Rename specific values
+malaria_big %>%
+  mutate(month = recode(month,
+                        Jan = "January",
+                        Feb = "February",
+                        Mar = "March")) %>%
+  head(3)
+```
+
+---
+
+# Step 9 — Handling Missing Values
+
+Missing values (`NA`) require careful thought: is the NA truly *missing*, or is it *meaningfully absent* (e.g., "no license → no driving accident")?
+
+## Detecting NAs
+
+```{r na-detect}
+data_clean
+
+is.na(data_clean)               # cell-level logical matrix
+colSums(is.na(data_clean))      # count NAs per column
+sum(is.na(data_clean))          # total NAs in the whole data frame
+mean(is.na(data_clean$accident_condu)) * 100  # % missing
+```
+
+## The NA Propagation Rule
+
+```{r na-propagation}
+NA + 2
+NA / 100
+mean(c(1, 2, NA, 4))          # NA — cannot compute
+mean(c(1, 2, NA, 4), na.rm = TRUE)  # 2.33 — correct
+```
+
+> ⚠️ R gives `NA` **priority** in all calculations. Always use `na.rm = TRUE` for summary functions when NAs are present.
+
+## Replacing NAs Conditionally — `ifelse()` and `case_when()`
+
+```{r na-replace}
+# Simple replacement: NA → 0
+ifelse(is.na(data_clean$accident_condu), 0, data_clean$accident_condu)
+
+# Conditional: if no permit, risk = 0; otherwise use driving accident rate
+ifelse(data_clean$permis == "Non", 0, data_clean$accident_condu)
+
+# Complex case: combine two columns, handling all NA combinations
+data_clean %>%
+  mutate(total_risk = case_when(
+    is.na(accident_condu) & is.na(accident_on_ondu) ~ 0,
+    is.na(accident_condu)                           ~ accident_on_ondu,
+    is.na(accident_on_ondu)                         ~ accident_condu,
+    TRUE ~ accident_condu + accident_on_ondu
+  ))
+```
+
+> 💡 **`case_when()` is the clean solution** to complex NA logic. It avoids the "code-en-escalier" (staircase code) problem that arises from deeply nested `ifelse()` calls.
+
+## Removing Rows with NAs — `na.omit()` and `drop_na()`
+
+```{r na-remove}
+# Base R
+na.omit(data_clean)
+
+# dplyr (more flexible)
+data_clean %>% drop_na()                           # any NA in any column
+data_clean %>% drop_na(accident_condu)             # only if this column is NA
+```
+
+---
+
+# Step 10 — Sorting with `arrange()`
+
+```{r arrange}
+# Ascending (default)
+malaria_big %>%
+  arrange(cases) %>%
+  head(5)
+
+# Descending
+malaria_big %>%
+  arrange(desc(cases)) %>%
+  head(5)
+
+# Multiple sort keys
+malaria_big %>%
+  arrange(region, desc(cases)) %>%
+  head(8)
+```
+
+---
+
+# Step 11 — Grouped Operations
+
+`group_by()` + `summarise()` is the most powerful pattern in dplyr.
+
+## `group_by()` + `summarise()`
+
+```{r group-summarise}
+# Mean cases per region
+malaria_big %>%
+  group_by(region) %>%
+  summarise(mean_cases = round(mean(cases), 0),
+            total_cases = sum(cases),
+            n = n(),
+            .groups = "drop")
+
+# Summary by region and month
+malaria_big %>%
+  group_by(region, month) %>%
+  summarise(mean_cases = round(mean(cases), 0),
+            .groups = "drop") %>%
+  arrange(region, month)
+```
+
+## `group_by()` + `mutate()` — Add Group Statistics
+
+```{r group-mutate}
+# Add the regional mean as a new column (keeps all rows)
+malaria_big %>%
+  group_by(region) %>%
+  mutate(region_mean = round(mean(cases), 0),
+         above_avg   = cases > region_mean) %>%
+  select(region, month, cases, region_mean, above_avg) %>%
+  head(8)
+```
+
+## Base R Equivalent — `aggregate()`
+
+```{r aggregate}
+aggregate(cases ~ region, data = malaria_big, FUN = mean)
+aggregate(cases ~ region + month, data = malaria_big, FUN = mean)
+```
+
+## `tapply()` — Apply a Function by Group
+
+```{r tapply}
+tapply(malaria_big$cases, malaria_big$region, mean)
+tapply(malaria_big$cases, list(malaria_big$region, malaria_big$month), mean)
+```
+
+---
+
+# Step 12 — Counting with `count()` and `tally()`
+
+```{r count}
+malaria_big %>% count(region)
+malaria_big %>% count(region, sort = TRUE)
+malaria_big %>% count(region, month)
+
+# tally() — equivalent when already grouped
+malaria_big %>%
+  group_by(region) %>%
+  tally(sort = TRUE)
+```
+
+---
+
+# Step 13 — Reshaping Data (Wide ↔ Long)
+
+Many R functions require **long format** (one row per observation-variable combination). `pivot_longer()` and `pivot_wider()` are the modern tools.
+
+## Wide → Long: `pivot_longer()`
+
+```{r pivot-longer}
+# Create a wide dataset: one row per region, one column per month
+cases_wide <- malaria_big %>%
+  select(region, month, cases) %>%
+  pivot_wider(names_from = month, values_from = cases)
+
+cases_wide
+
+# Convert back to long
+cases_long <- cases_wide %>%
+  pivot_longer(cols      = -region,
+               names_to  = "month",
+               values_to = "cases")
+
+cases_long
+```
+
+## Long → Wide: `pivot_wider()`
+
+```{r pivot-wider}
+# Monthly cases in wide format: one region per row, one month per column
+malaria_big %>%
+  select(region, month, cases) %>%
+  pivot_wider(names_from  = month,
+              values_from = cases)
+```
+
+> 💡 **Long format** is required by `ggplot2`, `dplyr::group_by()`, and most statistical models. **Wide format** is typical of raw exported data from spreadsheets.
+
+---
+
+# Step 14 — Splitting and Combining Columns
+
+## `separate()` — Split One Column into Several
+
+```{r separate}
+# Example: split a "region_month" column
+df_combined <- data.frame(
+  region_month = c("Centre_Jan","Littoral_Feb","Far_North_Mar"),
+  cases = c(480, 410, 850)
+)
+
+df_combined %>%
+  tidyr::separate(col  = region_month,
+                  into = c("region", "month"),
+                  sep  = "_")
+```
+
+## `unite()` — Merge Several Columns into One
+
+```{r unite}
+malaria_big %>%
+  select(region, month, year) %>%
+  tidyr::unite("region_period", region, month, year, sep = "-") %>%
+  head(4)
+```
+
+---
+
+# Step 15 — Joining Data Frames
+
+When your data is spread across multiple tables, joins combine them by a shared key.
+
+```{r joins}
+# Population data for each region
+population <- data.frame(
+  region     = c("Centre","Littoral","Far_North","North_West","South_West"),
+  population = c(4200000, 3800000, 6500000, 2900000, 2200000)
+)
+
+# Left join: keep all rows from malaria_big, add population
+malaria_joined <- malaria_big %>%
+  left_join(population, by = "region")
+
+head(malaria_joined)
+
+# Create a new incidence rate column
+malaria_joined %>%
+  mutate(incidence_per_1000 = round(cases / population * 1000, 2)) %>%
+  arrange(desc(incidence_per_1000)) %>%
+  head(5)
+```
+
+### Types of Joins
+
+| Function | Keeps |
+|---|---|
+| `left_join(x, y)` | All rows of x; matching rows of y |
+| `right_join(x, y)` | Matching rows of x; all rows of y |
+| `inner_join(x, y)` | Only rows matching in both x and y |
+| `full_join(x, y)` | All rows from both x and y |
+| `anti_join(x, y)` | Rows in x with **no** match in y |
+
+---
+
+# Step 16 — Removing Duplicates
+
+```{r duplicates}
+# Create a dataset with duplicate rows
+df_dup <- rbind(malaria_big[1:3, ], malaria_big[1:3, ], malaria_big[4:6, ])
+nrow(df_dup)
+
+# Remove exact duplicate rows
+df_nodup <- df_dup %>% distinct()
+nrow(df_nodup)
+
+# Keep distinct by specific columns
+df_dup %>% distinct(region, month, .keep_all = TRUE) %>% head(4)
+```
+
+---
+
+# Step 17 — Exploratory Data Analysis Packages
+
+The following packages accelerate the EDA phase with automated reports and summaries.
+
+## `skimr::skim()` — Rich Summary
+
+```{r skimr}
+# install.packages("skimr")
+library(skimr)
+skim(malaria_big)
+```
+
+Output includes: n_missing, completion_rate, mean, sd, p0 (min), p25, p50, p75, p100 (max), and mini-histograms for numeric columns.
+
+## `DataExplorer::plot_missing()` — Missing Value Overview
+
+```{r dataexplorer, eval=FALSE}
+# install.packages("DataExplorer")
+library(DataExplorer)
+
+plot_missing(malaria_big)       # bar chart: % missing per column
+profile_missing(malaria_big)    # table: count + % missing
+
+# Full HTML report in one command:
+create_report(malaria_big)
+```
+
+## `dlookr::diagnose()` — Data Quality Diagnostics
+
+```{r dlookr, eval=FALSE}
+# install.packages("dlookr")
+library(dlookr)
+
+diagnose(malaria_big)            # variable names, types, NAs, unique values
+diagnose_web_report(malaria_big) # interactive HTML diagnostic report
+eda_web_report(malaria_big)      # full EDA report (distributions + correlations)
+plot_na_intersect(malaria_big)   # visualize NA overlap between variables
+```
+
+## `GGally::ggpairs()` — Pairwise Relationship Matrix
+
+```{r ggpairs}
+library(GGally)
+
+malaria_big %>%
+  select(cases, rain) %>%
+  ggpairs(title = "Pairwise: Cases vs Rainfall")
+```
+
+---
+
+# Step 18 — A Complete Data Manipulation Pipeline
+
+Putting all steps together into one reproducible, readable workflow:
+
+```{r complete-pipeline}
+library(tidyverse)
+library(janitor)
+
+malaria_report <-
+  # 1. Start with raw data
+  malaria_big %>%
+
+  # 2. Clean column names
+  clean_names() %>%
+
+  # 3. Filter population of interest
+  filter(year == 2024) %>%
+
+  # 4. Select relevant columns
+  select(region, month, cases, rain) %>%
+
+  # 5. Create new variables
+  mutate(
+    burden = case_when(
+      cases > 1200 ~ "Very High",
+      cases > 800  ~ "High",
+      cases > 400  ~ "Moderate",
+      TRUE         ~ "Low"
+    ),
+    rain_cat = ifelse(rain > 150, "Rainy", "Dry")
+  ) %>%
+
+  # 6. Group and summarise
+  group_by(region, burden) %>%
+  summarise(
+    n          = n(),
+    mean_cases = round(mean(cases), 0),
+    mean_rain  = round(mean(rain), 0),
+    .groups    = "drop"
+  ) %>%
+
+  # 7. Sort
+  arrange(region, desc(mean_cases))
+
+malaria_report
+```
+
+---
+
+# Quick Reference — Key `dplyr` Verbs
+
+| Verb | Purpose | Example |
+|---|---|---|
+| `select()` | Choose columns | `select(region, cases)` |
+| `filter()` | Keep matching rows | `filter(cases > 500)` |
+| `mutate()` | Add/modify columns | `mutate(rate = cases/pop)` |
+| `rename()` | Rename columns | `rename(n = cases)` |
+| `arrange()` | Sort rows | `arrange(desc(cases))` |
+| `group_by()` | Group for aggregation | `group_by(region)` |
+| `summarise()` | Reduce to summary stats | `summarise(m = mean(cases))` |
+| `count()` | Count occurrences | `count(region)` |
+| `distinct()` | Remove duplicate rows | `distinct()` |
+| `left_join()` | Merge two tables | `left_join(pop, by="region")` |
+| `pivot_longer()` | Wide → Long | `pivot_longer(cols=-id)` |
+| `pivot_wider()` | Long → Wide | `pivot_wider(names_from=month)` |
+| `separate()` | Split one column | `separate(col, into=c(...))` |
+| `unite()` | Merge columns | `unite("new", col1, col2)` |
+| `drop_na()` | Remove NA rows | `drop_na(cases)` |
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Using the `data_acc` dataset created at the start of this lecture, clean the column names with `janitor::clean_names()`, convert `sexe` and `permis` to factors, and fix the erroneous age value of 196 (replace with `NA`).
+
+**Exercise 2.** Using `malaria_big`, filter to regions with more than 700 cases in January. Select only `region`, `cases`, and `rain`. Add a column `incidence_flag` that is `"High"` if cases > 1000 and `"Normal"` otherwise. Sort by cases descending.
+
+**Exercise 3.** Using `malaria_big`, compute the mean, maximum, and standard deviation of `cases` for each region. Then add the regional mean back to the original data frame as a new column `region_avg` using `group_by()` + `mutate()` (not `summarise()`).
+
+**Exercise 4.** Create a wide version of `malaria_big` where each row is a region and each column is a month's case count. Then convert it back to long format and verify it matches the original.
+
+**Exercise 5.** Join `malaria_big` with the population data frame (provided in this lecture). Compute a `rate_per_1000` incidence column. Identify the top 3 region-month combinations with the highest incidence rate.
+
+**Exercise 6.** Simulate a dataset with 5% of values missing in the `cases` column of `malaria_big`. Use `colSums(is.na())` to verify. Then fill the missing values with the **regional mean** using `group_by()` + `mutate()` + `case_when()` (or `replace_na()`).
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Data Manipulation in R*

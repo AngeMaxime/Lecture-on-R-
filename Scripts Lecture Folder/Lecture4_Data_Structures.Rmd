@@ -1,0 +1,914 @@
+---
+title: "R Data Types and Data Structures"
+subtitle: "A Comprehensive Lecture — From Atomic Types to Data Frames and Import"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+---
+
+# Introduction
+
+Every piece of information stored in R has a **type** — a description of what kind of value it is — and a **structure** — a description of how values are organized together. Understanding both is foundational to writing correct, efficient R code.
+
+In this lecture we cover:
+
+- **Atomic data types** — the building blocks of all R objects
+- **Vectors** — the simplest multi-value structure
+- **Factors** — categorical data with levels
+- **Matrices** — two-dimensional rectangular tables of one type
+- **Arrays** — matrices generalized to N dimensions
+- **Lists** — flexible containers for mixed-type data
+- **Data Frames** — the workhorse of data analysis in R
+- **Importing and exporting data** — reading real datasets from files
+
+---
+
+# Atomic Data Types
+
+Before building complex structures, you need to understand the five basic data types in R. Every value in R belongs to exactly one of these types.
+
+| Type | Description | Example | Suffix |
+|---|---|---|---|
+| `numeric` | Decimal numbers (default) | `10.5`, `3.14` | — |
+| `integer` | Whole numbers | `5L`, `100L` | `L` |
+| `complex` | Complex numbers | `3 + 2i` | `i` |
+| `character` | Text / strings | `"Hello"`, `"TP53"` | `" "` |
+| `logical` | Boolean TRUE/FALSE | `TRUE`, `FALSE` | — |
+
+Use `class()` to check the type of any object, and `is.*()` / `as.*()` to test and convert types.
+
+```{r data-types}
+# Numeric (double — stores decimals)
+x <- 10.5
+class(x)
+
+# Integer (whole number — must use L suffix)
+x <- 1000L
+class(x)
+
+# Complex (has a real and imaginary part)
+x <- 9 + 3i
+class(x)
+
+# Character (text string)
+x <- "R is exciting"
+class(x)
+
+# Logical (Boolean)
+x <- TRUE
+class(x)
+```
+
+## Checking and Converting Types
+
+```{r type-checking}
+age <- 25.7
+
+is.numeric(age)     # Is it numeric?
+is.integer(age)     # Is it an integer?
+is.character(age)   # Is it a string?
+
+# Convert between types
+as.integer(age)     # Truncates decimal → 25
+as.character(age)   # → "25.7"
+as.numeric("42.3")  # String → number
+as.logical(0)       # 0 → FALSE
+as.logical(1)       # 1 → TRUE
+```
+
+> 💡 `TRUE` and `FALSE` are treated as `1` and `0` in arithmetic operations. This makes logicals extremely useful for counting conditions.
+
+```{r logical-arithmetic}
+TRUE + TRUE     # 2
+FALSE + TRUE    # 1
+sum(c(TRUE, FALSE, TRUE, TRUE))  # counts TRUE values → 3
+```
+
+## Useful Math Functions
+
+R has many built-in mathematical functions that work on numeric values:
+
+```{r math-functions}
+sqrt(16)         # Square root
+abs(-7.5)        # Absolute value
+ceiling(4.2)     # Round up to nearest integer
+floor(4.8)       # Round down to nearest integer
+round(3.14159, 2) # Round to 2 decimal places
+log(10)          # Natural logarithm
+log10(100)       # Base-10 logarithm
+exp(1)           # Euler's number e^1
+
+max(5, 10, 15)   # Maximum value
+min(5, 10, 15)   # Minimum value
+```
+
+---
+
+# Vectors
+
+A **vector** is R's most fundamental data structure — an ordered collection of values of **the same type**. Even a single value like `x <- 5` is technically a vector of length 1.
+
+## Creating Vectors
+
+```{r vector-create}
+# Character vector
+fruits <- c("banana", "apple", "orange", "mango")
+
+# Numeric vector
+numbers <- c(10, 20, 30, 40, 50)
+
+# Logical vector
+flags <- c(TRUE, FALSE, TRUE, TRUE)
+
+# Integer sequence with the colon operator
+seq1 <- 1:10
+seq1
+
+# Custom sequence with seq()
+seq2 <- seq(from = 0, to = 100, by = 20)
+seq2
+
+# Repeated values with rep()
+rep(c(1, 2, 3), times = 3)   # repeat whole sequence 3 times
+rep(c(1, 2, 3), each  = 2)   # repeat each element 2 times
+```
+
+> 💡 **The `c()` function** stands for "combine" or "concatenate". It is the primary tool for creating vectors and works for all data types.
+
+## Exploring Vectors
+
+```{r vector-explore}
+fruits <- c("banana", "apple", "orange", "mango", "lemon")
+
+length(fruits)    # Number of elements
+sort(fruits)      # Sort alphabetically
+rev(fruits)       # Reverse order
+unique(c(1, 2, 2, 3, 3, 3))  # Unique values only
+```
+
+## Accessing Vector Elements
+
+R uses **1-based indexing** — the first element is at position 1 (not 0 like Python or C).
+
+```{r vector-access}
+fruits <- c("banana", "apple", "orange", "mango", "lemon")
+
+fruits[1]           # First element
+fruits[3]           # Third element
+fruits[c(1, 3, 5)]  # Elements 1, 3, and 5
+fruits[2:4]         # Elements 2 through 4
+fruits[-1]          # All except the first
+fruits[-c(1, 3)]    # All except positions 1 and 3
+```
+
+## Modifying Vector Elements
+
+```{r vector-modify}
+fruits <- c("banana", "apple", "orange")
+
+fruits[1] <- "pear"   # Change first element
+fruits
+```
+
+## Vector Operations
+
+Arithmetic applied to a vector operates **element-by-element**:
+
+```{r vector-ops}
+x <- c(1, 2, 3, 4, 5)
+
+x + 10        # Add 10 to each element
+x * 2         # Multiply each by 2
+x^2           # Square each element
+
+x1 <- c(1, 2, 3)
+x2 <- c(10, 20, 30)
+x1 + x2       # Element-wise addition
+```
+
+## Named Vectors
+
+```{r named-vector}
+scores <- c(Alice = 92, Bob = 87, Carla = 95)
+scores["Alice"]           # Access by name
+names(scores)             # Get all names
+```
+
+## Useful Vector Functions
+
+```{r vector-functions}
+v <- c(4, 7, 2, 9, 1, 5, 8, 3, 6)
+
+sum(v)
+mean(v)
+median(v)
+var(v)
+sd(v)
+range(v)      # min and max
+which.max(v)  # index of the maximum
+which.min(v)  # index of the minimum
+table(c("A", "T", "G", "A", "C", "A"))  # frequency table
+```
+
+---
+
+# Factors
+
+A **factor** is R's data structure for **categorical variables** — variables with a fixed set of possible values (called **levels**). Factors are essential for statistical modelling and controlled plotting.
+
+```{r factor-create}
+music_genre <- factor(c("Jazz", "Rock", "Classic", "Classic", "Pop", "Jazz", "Rock", "Jazz"))
+
+music_genre
+levels(music_genre)   # The unique categories
+nlevels(music_genre)  # Number of levels
+length(music_genre)   # Total number of items
+```
+
+## Setting Custom Level Order
+
+By default levels are ordered alphabetically. You can override this:
+
+```{r factor-levels}
+# Set a custom order
+sizes <- factor(c("Small", "Large", "Medium", "Small", "Large"),
+                levels = c("Small", "Medium", "Large"))
+levels(sizes)
+
+# Ordered factor (for ordinal data — allows < > comparisons)
+severity <- factor(c("Low", "High", "Medium", "Low"),
+                   levels  = c("Low", "Medium", "High"),
+                   ordered = TRUE)
+severity
+severity[1] < severity[2]   # Can compare because ordered = TRUE
+```
+
+## Accessing and Changing Factor Values
+
+```{r factor-access}
+music_genre <- factor(c("Jazz", "Rock", "Classic", "Pop"))
+
+music_genre[2]           # Access by position
+
+# Change a value (new value must be an existing level)
+music_genre[2] <- "Jazz"
+music_genre[2]
+```
+
+> ⚠️ You cannot assign a value to a factor that is not already one of its levels. If you need to add a new category, you must redefine the factor with the new level included.
+
+## Counting Factor Levels
+
+```{r factor-table}
+sex <- factor(c("Male", "Female", "Male", "Male", "Female"))
+table(sex)     # Frequency table — very useful in descriptive stats
+```
+
+---
+
+# Matrices
+
+A **matrix** is a **two-dimensional** collection of values of **the same type**, organized in rows and columns. It is essentially a vector with a shape attribute.
+
+## Creating a Matrix
+
+```{r matrix-create}
+# Fill by column (default, byrow = FALSE)
+m1 <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 3, ncol = 2)
+m1
+
+# Fill by row (byrow = TRUE)
+m2 <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 3, ncol = 2, byrow = TRUE)
+m2
+
+# Matrix of character strings
+cities <- matrix(c("London", "Paris", "Cairo", "Tokyo"), nrow = 2, ncol = 2)
+cities
+```
+
+## Naming Rows and Columns
+
+```{r matrix-names}
+expr_matrix <- matrix(c(2.1, 3.2, 4.5,
+                        1.5, 2.8, 3.9),
+                      nrow = 2, ncol = 3)
+
+rownames(expr_matrix) <- c("Gene1", "Gene2")
+colnames(expr_matrix) <- c("Sample1", "Sample2", "Sample3")
+expr_matrix
+```
+
+## Accessing Matrix Elements
+
+```{r matrix-access}
+m <- matrix(c("apple","banana","cherry","orange",
+              "grape","pineapple","pear","melon","fig"),
+            nrow = 3, ncol = 3)
+
+m[1, 2]        # Row 1, Column 2
+m[2, ]         # Entire row 2
+m[, 3]         # Entire column 3
+m[c(1, 2), ]   # Rows 1 and 2
+m[, c(1, 3)]   # Columns 1 and 3
+
+# Access by name when names are set
+expr_matrix["Gene1", "Sample2"]
+expr_matrix["Gene2", ]
+```
+
+## Adding and Removing Rows/Columns
+
+```{r matrix-modify}
+m <- matrix(c("London","Oxford","Cairo","Austin"), nrow = 2, ncol = 2)
+
+# Add a column
+cbind(m, c("Dubai", "Tokyo"))
+
+# Add a row
+rbind(m, c("City1", "City2"))
+
+# Remove first row and first column
+m[-1, -1]
+```
+
+## Matrix Dimensions and Membership
+
+```{r matrix-info}
+m <- matrix(c("apple","banana","cherry","orange"), nrow = 2, ncol = 2)
+
+dim(m)            # Rows × Columns
+nrow(m)           # Number of rows
+ncol(m)           # Number of columns
+length(m)         # Total cells = nrow × ncol
+
+"apple" %in% m    # Does "apple" exist in the matrix?
+"grape" %in% m    # Does "grape" exist?
+```
+
+## Matrix Arithmetic and Summary
+
+```{r matrix-math}
+num_mat <- matrix(1:12, nrow = 3, ncol = 4)
+
+rowSums(num_mat)    # Sum of each row
+colSums(num_mat)    # Sum of each column
+rowMeans(num_mat)   # Mean of each row
+colMeans(num_mat)   # Mean of each column
+
+# Combine with the result
+cbind(num_mat, row_total = rowSums(num_mat))
+```
+
+## Looping over a Matrix
+
+```{r matrix-loop}
+m <- matrix(c("a", "b", "c", "d"), nrow = 2, ncol = 2)
+
+for (row in 1:nrow(m)) {
+  for (col in 1:ncol(m)) {
+    cat("Row", row, "Col", col, "→", m[row, col], "\n")
+  }
+}
+```
+
+## Combining Two Matrices
+
+```{r matrix-combine}
+M1 <- matrix(c(1, 2, 3, 4), nrow = 2)
+M2 <- matrix(c(5, 6, 7, 8), nrow = 2)
+
+rbind(M1, M2)   # Stack vertically (add rows)
+cbind(M1, M2)   # Place side by side (add columns)
+```
+
+---
+
+# Arrays
+
+An **array** is a generalization of a matrix to **N dimensions**. While a matrix is 2D (rows × columns), an array can be 3D (rows × columns × layers) or higher.
+
+```{r array-create}
+# One-dimensional array (essentially a vector)
+one_dim <- c(1:24)
+
+# Three-dimensional array: 4 rows × 3 columns × 2 layers
+multi_dim <- array(one_dim, dim = c(4, 3, 2))
+multi_dim
+```
+
+## Accessing Array Elements
+
+```{r array-access}
+# Syntax: array[row, column, layer]
+multi_dim[1, , 1]   # All columns of row 1 in layer 1
+multi_dim[, 2, 1]   # All rows of column 2 in layer 1
+multi_dim[2, 3, 2]  # Row 2, Column 3, Layer 2
+```
+
+## Naming Array Dimensions
+
+```{r array-named}
+regions <- c("Centre", "Littoral", "Far_North")
+months  <- c("Jan", "Feb", "Mar")
+years   <- c("2023", "2024")
+
+malaria <- array(
+  data = c(450, 390, 820, 520, 440, 900, 610, 500, 950,
+           480, 410, 850, 550, 470, 920, 640, 515, 980),
+  dim  = c(3, 3, 2),
+  dimnames = list(Region = regions, Month = months, Year = years)
+)
+
+malaria
+malaria["Centre", "Jan", "2023"]          # Single cell
+malaria["Far_North", , "2024"]            # All months for Far North in 2024
+apply(malaria, 1, mean)                   # Mean per region across months and years
+```
+
+## Array Dimensions and Membership
+
+```{r array-info}
+dim(multi_dim)      # Dimensions (4 × 3 × 2)
+length(multi_dim)   # Total elements = 4 × 3 × 2 = 24
+
+3  %in% multi_dim   # Is 3 in the array?
+100 %in% multi_dim  # Is 100 in the array?
+```
+
+---
+
+# Lists
+
+A **list** is R's most flexible data structure. Unlike vectors, matrices, and arrays — which require all elements to be the same type — a list can contain **any mix of types and structures**, including other lists.
+
+## Creating a List
+
+```{r list-create}
+# Simple list
+my_list <- list("apple", 42, TRUE)
+my_list
+
+# Named list — recommended for clarity
+patient <- list(
+  name    = "Alice",
+  age     = 34,
+  scores  = c(90, 85, 88),
+  dataset = head(mtcars, 3)
+)
+patient
+```
+
+## Accessing List Elements
+
+Lists have two kinds of access:
+
+- **`[ ]` (single bracket)** — returns a **sub-list** (type stays as list)
+- **`[[ ]]` (double bracket)** — extracts the **actual element**
+- **`$` operator** — extracts by name (equivalent to `[[ ]]`)
+
+```{r list-access}
+my_list <- list("apple", 42, TRUE, c(1, 2, 3))
+
+my_list[1]      # Returns a list of length 1 — still a list
+my_list[[1]]    # Returns "apple" directly
+my_list[[4]]    # Returns the vector c(1, 2, 3)
+my_list[[4]][2] # Second element of the vector inside the list
+
+# Named access
+patient$name         # "Alice"
+patient[["scores"]]  # c(90, 85, 88)
+patient$scores[1]    # 90
+```
+
+## Modifying Lists
+
+```{r list-modify}
+my_list <- list("apple", "banana", "cherry")
+
+# Change an element
+my_list[[1]] <- "pear"
+my_list
+
+# Add an element
+my_list <- append(my_list, "orange")
+my_list <- append(my_list, "kiwi", after = 2)   # After position 2
+my_list
+
+# Remove an element
+my_list[-1]   # All except position 1
+```
+
+## List Properties
+
+```{r list-info}
+my_list <- list("apple", "banana", "cherry")
+
+length(my_list)
+"apple" %in% my_list   # Membership test
+
+# Loop through a list
+for (item in my_list) {
+  print(item)
+}
+
+# Join two lists
+list1 <- list("a", "b")
+list2 <- list(1, 2)
+c(list1, list2)
+```
+
+## Nested Lists
+
+Lists can contain other lists, making them ideal for storing hierarchical data:
+
+```{r nested-list}
+gene_db <- list(
+  metadata = data.frame(
+    gene     = c("BRCA1", "TP53", "EGFR"),
+    function_ = c("DNA repair", "Tumor suppressor", "Cell growth")
+  ),
+  sequences  = c("ATGCGATC", "GCTAGCTA", "TTGCATGC"),
+  expression = matrix(c(2.1, 3.2, 1.5, 2.8, 5.5, 6.7),
+                      nrow = 3, ncol = 2,
+                      dimnames = list(c("BRCA1","TP53","EGFR"),
+                                      c("Sample1","Sample2")))
+)
+
+# Access nested elements
+gene_db$metadata
+gene_db$sequences[2]
+gene_db[["expression"]]["TP53", ]
+gene_db[[3]]["BRCA1", "Sample2"]
+```
+
+---
+
+# Data Frames
+
+The **data frame** is the most commonly used data structure in R for data analysis. It is a **table** where:
+
+- Each **column** is a variable (and can be a different type)
+- Each **row** is an observation
+- All columns must have the **same number of rows**
+
+Think of it as a spreadsheet or a SQL table.
+
+## Creating a Data Frame
+
+```{r df-create}
+# Build manually
+athletes <- data.frame(
+  player = c("Ronaldo", "Messi", "Salah"),
+  number = c(7, 30, 11),
+  height = c(187, 169, 175),
+  stringsAsFactors = FALSE
+)
+
+athletes
+```
+
+## Inspecting a Data Frame
+
+```{r df-inspect}
+data(airquality)   # Built-in dataset: NYC air quality
+
+dim(airquality)    # Rows × Columns
+nrow(airquality)   # Number of rows
+ncol(airquality)   # Number of columns
+length(airquality) # Same as ncol — number of variables
+
+str(airquality)    # Structure: column names, types, preview
+head(airquality)   # First 6 rows
+head(airquality, 10) # First 10 rows
+tail(airquality)   # Last 6 rows
+names(airquality)  # Column names
+summary(airquality)  # Statistical summary of each column
+```
+
+## Accessing Data Frame Elements
+
+```{r df-access}
+df <- data.frame(
+  Training = c("Strength", "Stamina", "Other"),
+  Pulse    = c(100, 150, 120),
+  Duration = c(60, 30, 45)
+)
+
+# By column position
+df[1]           # Returns a 1-column data frame (keeps class)
+df[[1]]         # Returns the vector directly
+df[, 1]         # Also returns the vector
+
+# By column name
+df["Pulse"]         # 1-column data frame
+df[["Pulse"]]       # Vector
+df$Pulse            # Vector (most common syntax)
+
+# By row
+df[2, ]             # Row 2, all columns
+df[1:2, ]           # Rows 1 and 2
+df[1, "Duration"]   # Row 1, column "Duration"
+
+# Subset rows with a condition
+subset(airquality, Wind > 15)
+airquality[airquality$Temp > 90, ]
+```
+
+## Adding Rows and Columns
+
+```{r df-add}
+athletes <- data.frame(
+  player = c("Ronaldo", "Messi", "Salah"),
+  number = c(7, 30, 11),
+  height = c(187, 169, 175)
+)
+
+# Add a column with $
+athletes$goals <- c(700, 800, 250)
+athletes
+
+# Add a column with cbind()
+cbind(athletes, nationality = c("Portugal", "Argentina", "Egypt"))
+
+# Add a row with rbind()
+rbind(athletes, data.frame(player = "Neymar",
+                           number = 10,
+                           height = 175,
+                           goals  = 400))
+```
+
+## Removing Rows and Columns
+
+```{r df-remove}
+df <- data.frame(
+  A = c(1, 2, 3),
+  B = c(4, 5, 6),
+  C = c(7, 8, 9)
+)
+
+df[-1, ]       # Remove row 1
+df[, -2]       # Remove column 2
+df[-c(1, 3), ] # Remove rows 1 and 3
+```
+
+## Combining Data Frames
+
+```{r df-combine}
+df1 <- data.frame(name = c("Alice", "Bob"), score = c(90, 85))
+df2 <- data.frame(name = c("Carla", "Dave"), score = c(78, 92))
+
+# Stack vertically (same columns)
+rbind(df1, df2)
+
+# Place side by side (same number of rows)
+df3 <- data.frame(grade = c("A", "B"))
+cbind(df1, df3)
+```
+
+## Handling Missing Values in Data Frames
+
+```{r df-missing}
+df <- data.frame(x = c(1, NA, 3), y = c(NA, 5, 6))
+
+is.na(df)                     # Which cells are NA?
+colSums(is.na(df))            # Count NAs per column
+complete.cases(df)            # Which rows have no NAs?
+df[complete.cases(df), ]      # Keep only complete rows
+na.omit(df)                   # Same as above
+
+# Replace NAs
+df$x[is.na(df$x)] <- 0       # Replace NA in column x with 0
+```
+
+## Type Conversion in Data Frames
+
+```{r df-types}
+df <- data.frame(age = c("25", "30", "22"), score = c(90, 85, 95))
+
+str(df)                          # age is character — wrong type
+
+df$age <- as.integer(df$age)     # Fix: convert to integer
+str(df)
+
+# Available conversions:
+# as.numeric(), as.integer(), as.character(), as.factor(), as.logical()
+```
+
+## Ordering a Data Frame
+
+```{r df-order}
+airquality[order(airquality$Temp), ]            # Ascending by Temp
+airquality[order(-airquality$Temp), ]           # Descending
+airquality[order(airquality$Month,
+                 airquality$Temp), ]            # Sort by 2 columns
+```
+
+---
+
+# Comparison: All Data Structures
+
+| Feature | Vector | Factor | Matrix | Array | List | Data Frame |
+|---|---|---|---|---|---|---|
+| Dimensions | 1D | 1D | 2D | N-D | 1D | 2D |
+| Types allowed | One | One (levels) | One | One | Mixed | Mixed (per column) |
+| Named elements | Yes | Yes (levels) | Yes (row/col) | Yes | Yes | Yes (col names) |
+| Main use | Sequences | Categories | Numeric tables | Multi-dim data | Heterogeneous | Dataset/table |
+| Create with | `c()` | `factor()` | `matrix()` | `array()` | `list()` | `data.frame()` |
+
+---
+
+# Importing and Exporting Data
+
+In real-world analysis, data rarely comes from typing it manually. You will read data from CSV files, Excel spreadsheets, tab-separated files, or URLs.
+
+## Reading CSV Files
+
+```{r import-csv, eval=FALSE}
+# Classic (returns a data.frame)
+data <- read.csv("myfile.csv")
+
+# Modern tidyverse way (returns a tibble)
+library(readr)
+data <- read_csv("myfile.csv")
+
+# View the working directory
+getwd()
+
+# Change it
+setwd("path/to/your/data")
+```
+
+## Reading Tab-Separated Files (TSV)
+
+```{r import-tsv, eval=FALSE}
+annotations <- read.delim("annotations.tsv")       # sep = "\t" by default
+annotations <- read.table("annotations.tsv",
+                          header = TRUE, sep = "\t")
+```
+
+## Reading Excel Files
+
+```{r import-excel, eval=FALSE}
+# install.packages("readxl")
+library(readxl)
+
+pathway_data <- read_excel("pathway_data.xlsx", sheet = 1)
+head(pathway_data)
+```
+
+## Importing Data Directly from a URL
+
+```{r import-url, eval=FALSE}
+url  <- "https://raw.githubusercontent.com/HackBio-Internship/public_datasets/main/metadata_sample.tsv"
+data <- read.csv(url)
+dim(data)
+```
+
+## Inspecting an Imported Data Frame
+
+```{r inspect-pattern, eval=FALSE}
+str(data)                     # Structure and types
+glimpse(data)                 # dplyr version (compact)
+head(data)                    # First 6 rows
+dim(data)                     # Rows × Columns
+colSums(is.na(data))          # Missing values per column
+sapply(data, class)           # Type of each column
+sapply(data, function(x) length(unique(x)))  # Unique values per column
+```
+
+## Exporting Data
+
+```{r export, eval=FALSE}
+# Write to CSV
+write.csv(data, file = "output.csv", row.names = FALSE)
+
+# Save R objects (.Rda format — preserves all R types)
+save(data, file = "data.Rda")
+
+# Reload later
+load("data.Rda")
+
+# rio package — universal import/export
+# install.packages("rio")
+library(rio)
+export(data, file = "output.xlsx")   # Write to Excel
+export(data, file = "output.csv")    # Write to CSV
+data2 <- import("myfile.csv")        # Read any format
+```
+
+## data.frame vs tibble vs data.table
+
+```{r df-types-compare, eval=FALSE}
+library(tibble)
+library(data.table)
+
+# Classic data frame
+df  <- data.frame(name = c("Alice", "Bob"), age = c(25, 30))
+
+# Tibble — tidyverse format, better printing, no rownames
+tb  <- tibble(name = c("Alice", "Bob"), age = c(25, 30))
+
+# data.table — optimized for large datasets (millions of rows)
+dt  <- data.table(name = c("Alice", "Bob"), age = c(25, 30))
+
+# Convert between formats
+data.frame(tb)      # tibble → data.frame
+as_tibble(df)       # data.frame → tibble
+as.data.table(df)   # data.frame → data.table
+```
+
+---
+
+# A Bioinformatics Application
+
+Here is how all data structures come together in a real genomics workflow:
+
+```{r bioinformatics-example}
+# 1. Vector — DNA sequence
+dna <- c("A", "T", "G", "C", "A", "T", "G", "A")
+
+# Nucleotide frequencies
+freq <- table(dna)
+print(freq)
+
+# Most frequent nucleotide
+most_freq <- names(which.max(freq))
+cat("Most frequent nucleotide:", most_freq, "\n")
+
+# 2. Matrix — gene expression
+expr <- matrix(c(2.1, 3.2, 4.5,
+                 1.5, 2.8, 3.9,
+                 5.5, 6.7, 2.6,
+                 7.4, 1.6, 3.5,
+                 4.5, 2.5, 6.3),
+               nrow = 5, ncol = 3)
+
+rownames(expr) <- c("BRCA1", "TP53", "EGFR", "MYC", "ALK")
+colnames(expr) <- c("Control", "Treatment1", "Treatment2")
+
+# Mean expression per gene
+rowMeans(expr)
+
+# 3. Data Frame — sample metadata
+metadata <- data.frame(
+  sample     = c("Control", "Treatment1", "Treatment2"),
+  group      = factor(c("CTRL", "TREAT", "TREAT")),
+  replicate  = c(1L, 1L, 2L)
+)
+metadata
+
+# 4. List — bring it all together
+experiment <- list(
+  sequences  = dna,
+  expression = expr,
+  metadata   = metadata
+)
+
+# Access nested elements
+experiment$metadata$group
+experiment[["expression"]]["TP53", ]
+```
+
+---
+
+# Practice Exercises
+
+**Exercise 1 — Data Types.** Create one variable of each type: `numeric`, `integer`, `complex`, `character`, and `logical`. Use `class()` to verify each. Then convert the numeric to integer and the character `"42.5"` to numeric.
+
+**Exercise 2 — Vectors.** Create a numeric vector with the values `c(5, 12, 3, 8, 1, 9, 4, 7, 2, 6)`. Compute its mean, median, and standard deviation. Extract all values greater than 5. Sort it in descending order.
+
+**Exercise 3 — Factors.** Create a character vector of 10 observations of blood type: `"A"`, `"B"`, `"AB"`, `"O"`. Convert it to a factor. Use `table()` to count frequencies. Then create an ordered factor for disease severity: `"Mild"`, `"Moderate"`, `"Severe"`. Verify that `"Mild" < "Severe"` returns `TRUE`.
+
+**Exercise 4 — Matrix.** Create a 4×3 matrix filled with values 1 to 12 (by row). Name the rows `"R1"`–`"R4"` and columns `"C1"`–`"C3"`. Extract column 2. Compute row sums and column means. Add a new column that is the row mean of each row.
+
+**Exercise 5 — List.** Create a list representing a patient with fields: `name` (character), `age` (integer), `measurements` (a numeric vector of 5 blood pressure readings), and `history` (a data frame with 2 columns: `date` and `diagnosis`). Access each element and print the second blood pressure reading.
+
+**Exercise 6 — Data Frame.** Using the built-in `airquality` dataset: (1) Check its dimensions and structure. (2) Find how many NAs are in each column. (3) Keep only rows where `Temp > 85` and `Wind < 10`. (4) Add a new column `Temp_C = (Temp - 32) * 5/9`. (5) Sort by `Ozone` in descending order.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — R Data Types and Data Structures*

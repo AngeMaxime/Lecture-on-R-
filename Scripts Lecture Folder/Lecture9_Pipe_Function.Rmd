@@ -1,0 +1,733 @@
+---
+title: "The Pipe Function in R"
+subtitle: "A Comprehensive Lecture — from `%>%` to `|>` and the full magrittr family"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##",
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+---
+
+# What is the Pipe?
+
+**One sentence summary:** *Take what is on the left, and pass it to the right.*
+
+The pipe operator is one of the most transformative ideas in modern R programming. It lets you chain a sequence of operations together in a single, readable expression — left to right, step by step — instead of nesting function calls inside each other or creating a string of throwaway intermediate variables.
+
+There are two pipe operators you will encounter in R:
+
+| Operator | Origin | Available since |
+|---|---|---|
+| `%>%` | `magrittr` package | 2014 |
+| `\|>` | Base R (native) | R 4.1.0 (2021) |
+
+Both do roughly the same thing. We start with `%>%` because it is more powerful and still the most widely used in the tidyverse ecosystem.
+
+---
+
+# A Brief History
+
+The `%>%` operator was created by **Stefan Milton Bache** and popularized by **Hadley Wickham** through the `magrittr` package in 2014. It was inspired by:
+
+- The **Unix pipe** `|` (which sends the output of one command to the next)
+- **F#** language pipelines
+- The desire to make R code read more like prose — a sequence of instructions rather than a tangle of nested brackets
+
+The operator became so central to R workflows that in 2021, R 4.1.0 introduced a **native pipe `|>`** built directly into the language, requiring no package at all.
+
+---
+
+# The Problem the Pipe Solves
+
+Imagine you want to perform four operations on a vector in sequence: take the logarithm, take the absolute value, take the square root, then compute the mean.
+
+## Approach 1 — Nested Function Calls
+
+```{r nested-calls}
+# Hard to read — must parse from inside out
+mean(sqrt(abs(log(1:10))))
+```
+
+This works, but you have to read it **inside-out**: `log` first, then `abs`, then `sqrt`, then `mean`. This is the opposite of how we think about a sequence of steps.
+
+## Approach 2 — Intermediate Variables
+
+```{r intermediate-vars}
+a1 <- 1:10
+a2 <- log(a1)
+a3 <- abs(a2)
+a4 <- sqrt(a3)
+a5 <- mean(a4)
+a5
+```
+
+This is readable, but now we have five variables (`a1` through `a5`) that we will never use again. They clutter the environment and require us to invent names for things we don't care about.
+
+## Approach 3 — The Pipe ✅
+
+```{r pipe-solution}
+library(magrittr)
+
+1:10 %>%
+  log() %>%
+  abs() %>%
+  sqrt() %>%
+  mean()
+```
+
+The pipe reads exactly like a recipe: *start with 1 to 10, then take the log, then the absolute value, then the square root, then the mean*. No nesting, no temporary variables.
+
+> 💡 **Core rule:** `x %>% f()` is exactly equivalent to `f(x)`. The left-hand side is automatically inserted as the **first argument** of the function on the right.
+
+---
+
+# How the Pipe Works — Step by Step
+
+```{r pipe-step-by-step}
+# These four expressions are all equivalent:
+
+sum(1:10)           # classic nested call
+1:10 %>% sum()      # pipe version
+
+# Multi-step chain — each result flows into the next
+1:10 %>%
+  log()  %>%    # log(1:10)
+  abs()  %>%    # abs(result above)
+  sqrt() %>%    # sqrt(result above)
+  mean()        # mean(result above)
+```
+
+```{r pipe-mental-model}
+# Think of each line as: "take what I just computed, and pass it here"
+# Step 1: 1:10         → log()   → NaN-free log values
+# Step 2: those values → abs()   → absolute values
+# Step 3: those values → sqrt()  → square roots
+# Step 4: those values → mean()  → single number
+```
+
+---
+
+# Keyboard Shortcut
+
+You will use the pipe constantly, so memorize the shortcut:
+
+| OS | Shortcut |
+|---|---|
+| **Windows / Linux** | `Ctrl + Shift + M` |
+| **Mac** | `Cmd + Shift + M` |
+
+> 💡 In RStudio, you can configure which pipe operator this shortcut inserts: **Tools → Global Options → Code → Use native pipe operator `|>`**. By default it inserts `%>%`.
+
+---
+
+# Assigning a Pipe Result
+
+A pipeline is an expression like any other — you can assign its result to a variable:
+
+```{r pipe-assign}
+a <- 1:10
+
+# Assign the result of the pipeline to b
+b <- a %>%
+  log()  %>%
+  abs()  %>%
+  sqrt() %>%
+  mean(na.rm = TRUE)
+
+a   # a is unchanged — the pipe never modifies the original object
+b   # b holds the final computed value
+```
+
+You can also use the **right-assignment arrow** `->` at the end of a pipeline (though less common):
+
+```{r right-assign}
+a %>%
+  log()  %>%
+  abs()  %>%
+  sqrt() %>%
+  mean(na.rm = TRUE) -> b
+
+b
+```
+
+> 💡 The original object `a` is **never modified** by the pipe. The pipe always produces a new value; it does not change its inputs in place.
+
+---
+
+# The Pipe with dplyr — Data Analysis
+
+The pipe truly shines when combined with `dplyr` for data manipulation. Each step modifies the data in a clean, readable sequence:
+
+```{r pipe-dplyr}
+library(dplyr)
+
+mtcars %>%
+  filter(cyl == 6) %>%           # Step 1: Keep only 6-cylinder cars
+  group_by(am) %>%               # Step 2: Group by transmission type
+  summarize(avg_mpg = mean(mpg), # Step 3: Compute mean mpg per group
+            n = n()) %>%
+  arrange(desc(avg_mpg))         # Step 4: Sort from highest to lowest
+```
+
+Without the pipe, the equivalent would be either deeply nested or full of temporary variables — both harder to write and maintain.
+
+## A Complete Data Pipeline
+
+```{r complete-pipeline}
+library(dplyr)
+library(tidyr)
+
+# Full pipeline: filter → compute → reshape → display
+mtcars %>%
+  filter(mpg > 15) %>%
+  mutate(
+    efficiency = ifelse(mpg > 25, "High", "Medium"),
+    hp_per_cyl = hp / cyl
+  ) %>%
+  group_by(cyl, efficiency) %>%
+  summarise(
+    mean_mpg     = round(mean(mpg), 1),
+    mean_hp_cyl  = round(mean(hp_per_cyl), 1),
+    count        = n(),
+    .groups      = "drop"
+  ) %>%
+  arrange(cyl, desc(mean_mpg))
+```
+
+---
+
+# Adding Extra Arguments to Piped Functions
+
+The pipe passes the left-hand side as the **first argument**. You can freely add additional arguments to the receiving function:
+
+```{r extra-args}
+c(1, 2, NA, 4, 5) %>%
+  mean(na.rm = TRUE)    # na.rm is an extra argument, not affected by the pipe
+
+c(3, 1, 4, 1, 5, 9) %>%
+  sort(decreasing = TRUE)
+
+c("banana", "apple", "cherry") %>%
+  paste(collapse = ", ")
+```
+
+---
+
+# The `.` Placeholder — Piping to a Non-First Argument
+
+By default, the pipe places the left-hand side as the **first** argument. When you need it in a different position, use **`.`** as a placeholder:
+
+```{r dot-placeholder}
+# lm() expects data= as its second argument — use . to place data there
+iris %>%
+  lm(Sepal.Length ~ Sepal.Width, data = .)
+
+# Using . in a calculation
+iris %>%
+  with(Sepal.Length / Sepal.Width) %>%  # compute ratio
+  mean(., trim = 0.1)                   # . = the ratio vector above
+```
+
+```{r dot-indexing}
+# You can even index into . with [[ ]] or []
+mtcars %>%
+  summary() %>%
+  .[, "mpg"]    # extract the mpg column from the summary matrix
+```
+
+> ⚠️ The `.` placeholder is specific to `%>%` from `magrittr`. The native `|>` uses `_` instead (R 4.2+), but with more restrictions — more on this below.
+
+---
+
+# Using `%>%` with Curly Braces `{}`
+
+Wrapping an expression in `{}` gives you a mini-function body where you can write any R code, and `.` always refers to the piped value:
+
+```{r curly-braces}
+# Apply an arithmetic expression that isn't a named function
+5 %>% { . + 3 }
+
+10 %>%
+  { . * 2 } %>%
+  { . - 5 } %>%
+  { . / 3 }
+```
+
+This is also how you use arithmetic operators directly with the pipe:
+
+```{r arithmetic-pipe}
+# Using backtick-quoted operators (infix form)
+5 %>% `+`(3)   # same as 5 + 3
+
+10 %>%
+  `+`(2)  %>%
+  `-`(5)  %>%
+  `/`(3)
+```
+
+---
+
+# `%>%` with Conditional Logic
+
+You can embed `if/else` logic inside a pipeline using `{}`:
+
+```{r pipe-conditional}
+mtcars %>%
+  { if (nrow(.) > 20) filter(., mpg > 20) else . } %>%
+  summarise(mean_mpg = mean(mpg),
+            n        = n())
+```
+
+Here `.` inside the `{}` refers to the data frame passed by the pipe. The entire `{}` block is treated as a single expression whose result flows forward.
+
+---
+
+# `%>%` with Anonymous Functions
+
+In `magrittr`, you can create a **reusable partial pipeline** by starting a chain with `.`:
+
+```{r anon-function-pipe}
+# Define a reusable pipeline function
+multiply_by_pi <- . %>% { . * pi }
+
+# Call it like a normal function
+multiply_by_pi(5)
+multiply_by_pi(10)
+multiply_by_pi(c(1, 2, 3))
+```
+
+This is equivalent to writing `function(x) x * pi` — the `.` at the start signals "this is a function, not a computation".
+
+---
+
+# `%>%` with `stringr` and `ggplot2`
+
+## String Manipulation
+
+```{r pipe-stringr}
+library(stringr)
+
+" Hello, World! " %>%
+  str_to_lower()          %>%    # lowercase
+  str_replace_all("o", "0") %>%  # replace o with 0
+  str_trim()                     # strip leading/trailing spaces
+```
+
+## Data Visualization with ggplot2
+
+> 💡 Notice that inside a `ggplot2` chain you use `+` to add layers, **not** `%>%`. The pipe hands off the data to `ggplot()`, and `+` takes over for the plot layers.
+
+```{r pipe-ggplot}
+library(ggplot2)
+
+mtcars %>%
+  filter(cyl %in% c(4, 6, 8)) %>%         # pipe step: filter data
+  ggplot(aes(x = wt, y = mpg,             # hand off to ggplot
+             color = factor(cyl))) +
+  geom_point(size = 3, alpha = 0.7) +     # + from here on
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title  = "Weight vs Fuel Economy",
+       x      = "Weight (1000 lbs)",
+       y      = "Miles per Gallon",
+       color  = "Cylinders") +
+  theme_bw()
+```
+
+---
+
+# Nested Pipelines
+
+Pipelines can be nested — one pipeline computing a value that feeds into another:
+
+```{r nested-pipeline}
+mtcars %>%
+  group_by(cyl) %>%
+  summarise(
+    mean_mpg = mean(mpg),
+    sd_mpg   = sd(mpg),
+    count    = n(),
+    .groups  = "drop"
+  ) %>%
+  mutate(
+    cv  = round(sd_mpg / mean_mpg, 3),     # coefficient of variation
+    pct = round(count / sum(count) * 100, 1) # share of total cars
+  ) %>%
+  arrange(desc(mean_mpg))
+```
+
+---
+
+# The Native Pipe `|>` (R 4.1+)
+
+Since R 4.1.0, you can use `|>` without loading any package. It is built directly into the language:
+
+```{r native-pipe-enable, eval=FALSE}
+# Enable in RStudio: Tools → Global Options → Code → Use native pipe operator
+```
+
+```{r native-pipe-basic}
+# Basic usage — identical to %>% for simple chains
+mtcars |>
+  subset(cyl == 6) |>
+  summary()
+```
+
+## `%>%` vs `|>` — Key Differences
+
+| Feature | `%>%` (magrittr) | `\|>` (native R) |
+|---|---|---|
+| **Package required** | `magrittr` or `tidyverse` | None |
+| **Available since** | 2014 | R 4.1.0 (2021) |
+| **Placeholder** | `.` (flexible, anywhere) | `_` (R 4.2+, named args only) |
+| **Anonymous functions** | `. %>% { expr }` | `(\(x) expr)()` |
+| **Curly brace expressions** | `%>% { ... }` | Not directly supported |
+| **Speed** | Slightly slower | Slightly faster |
+| **Ecosystem support** | Huge (all tidyverse docs) | Growing |
+
+```{r pipe-comparison}
+# Doubling every element
+
+# With %>%
+1:10 %>% { . * 2 }
+
+# With |> (requires anonymous function syntax)
+1:10 |> (\(x) x * 2)()
+```
+
+```{r native-pipe-placeholder}
+# Native pipe placeholder _ (R 4.2+ only, named arguments only)
+mtcars |>
+  lm(formula = mpg ~ wt, data = _) |>
+  summary()
+```
+
+> 💡 **Which one to use?** Use `%>%` if you are working in the tidyverse or need the `.` placeholder and curly-brace tricks. Use `|>` if you want a dependency-free script for simpler chains.
+
+---
+
+# The Full magrittr Family
+
+`magrittr` provides four pipe operators, each for a different purpose:
+
+## `%>%` — The Standard Pipe
+
+The main pipe — passes the left-hand side as the first argument to the right.
+
+```{r magrittr-main}
+library(magrittr)
+
+1:5 %>% sum()   # sum(1:5)
+```
+
+## `%T>%` — The "Tee" Pipe (Side Effect + Continue)
+
+`%T>%` passes the value to a function **for a side effect** (like printing or plotting), then **continues** with the original value unchanged:
+
+```{r tee-pipe}
+# Without %T>%: nrow() would receive the plot's invisible return value
+# With %T>%: the original data frame flows through to nrow()
+mtcars %>%
+  select(hp, mpg) %T>%
+  plot() %>%          # side effect: create plot
+  nrow()              # continues with the data frame → 32
+```
+
+Think of `%T>%` as a "tap" on the pipe — you branch off for a side effect, then return to the main flow.
+
+## `%$%` — The Exposition Pipe
+
+`%$%` **exposes** the columns (or components) of the left-hand side so they can be referred to by name directly:
+
+```{r exposition-pipe}
+# Without %$%: need to use $ accessor
+cor(mtcars$hp, mtcars$mpg)
+
+# With %$%: column names are directly in scope
+mtcars %$%
+  cor(hp, mpg)
+
+mtcars %$%
+  plot(hp, mpg)
+```
+
+This is particularly useful with functions that don't have a `data =` argument.
+
+## `%<>%` — The Assignment Pipe (In-Place Modification)
+
+`%<>%` applies the pipeline **and assigns the result back** to the original variable:
+
+```{r assignment-pipe}
+# Classic version — two lines
+x <- 1:3
+x <- sum(x)
+x
+
+# With %<>% — one line
+x <- 1:3
+x %<>% sum()
+x
+
+# More complex in-place transformation
+v <- c(3, 1, 4, 1, 5, 9, 2, 6)
+v %<>% sort() %<>% rev()   # sort ascending then reverse to descending
+v
+```
+
+> ⚠️ Use `%<>%` carefully — in-place modification can make code harder to debug, since the original value is lost.
+
+## The Four Pipes — Summary
+
+| Operator | Name | What it does |
+|---|---|---|
+| `%>%` | Standard pipe | Pass LHS as first arg to RHS |
+| `%T>%` | Tee pipe | Side effect on RHS, then pass LHS forward |
+| `%$%` | Exposition pipe | Expose names of LHS inside RHS |
+| `%<>%` | Assignment pipe | Apply pipeline and save result back to LHS |
+
+---
+
+# Custom Infix Operators
+
+The pipe `%>%` is itself an **infix operator** — it sits between its two arguments. Under the hood it is just a function:
+
+```{r pipe-as-function}
+# These are identical
+1:10 %>% sum()
+`%>%`(1:10, sum())
+```
+
+R lets you define your **own infix operators**. The rules are simple:
+
+1. The name must start and end with `%`
+2. Define it like a regular two-argument function
+
+```{r custom-infix}
+# A custom addition operator
+`%plus%` <- function(a, b) a + b
+
+3 %plus% 7
+`%plus%`(3, 7)   # called as a regular function
+
+# A "not in" operator (complement of %in%)
+`%not_in%` <- function(x, table) !x %in% table
+
+c(1, 2, 3, 4, 5) %not_in% c(2, 4)   # TRUE where element is NOT in the set
+
+# A percent-change operator
+`%pct_change%` <- function(new, old) round((new - old) / old * 100, 1)
+
+120 %pct_change% 100   # +20%
+85  %pct_change% 100   # -15%
+```
+
+---
+
+# Pipe Style Guide
+
+Well-formatted pipes make code easy to read and maintain:
+
+```{r style-good}
+# Good: one step per line, consistent indentation
+mtcars %>%
+  filter(cyl == 4) %>%
+  select(mpg, wt, hp) %>%
+  mutate(wt_kg = wt * 453.6) %>%
+  summarise(mean_mpg = mean(mpg))
+```
+
+```{r style-bad, eval=FALSE}
+# Avoid: everything on one line (hard to read and debug)
+mtcars %>% filter(cyl == 4) %>% select(mpg, wt, hp) %>% mutate(wt_kg = wt * 453.6) %>% summarise(mean_mpg = mean(mpg))
+
+# Avoid: chains longer than ~10 steps — consider breaking into named steps
+```
+
+**Recommended conventions:**
+
+- Put `%>%` at the **end** of a line, never at the start of the next
+- Indent each step by 2 spaces
+- Limit chains to steps that form a logical unit; save intermediate results when needed
+- Use blank lines to separate logical groups within a long pipeline
+- Assign the result when you will use it again
+
+---
+
+# Debugging Pipelines
+
+When a pipeline produces an unexpected result, isolate the problem by running it **step by step** — add or remove one `%>%` at a time:
+
+```{r debug-pipeline}
+# Full pipeline
+mtcars %>%
+  filter(cyl == 4) %>%
+  mutate(wt_kg = wt * 453.6) %>%
+  summarise(mean_wt_kg = mean(wt_kg))
+
+# Debug: check what filter produces
+mtcars %>%
+  filter(cyl == 4)
+
+# Debug: check what mutate produces
+mtcars %>%
+  filter(cyl == 4) %>%
+  mutate(wt_kg = wt * 453.6)
+```
+
+You can also use `%T>%` to inspect intermediate values without breaking the chain:
+
+```{r debug-tee}
+mtcars %>%
+  filter(cyl == 4) %T>%
+  { cat("After filter:", nrow(.), "rows\n") } %>%
+  mutate(wt_kg = wt * 453.6) %T>%
+  { cat("After mutate: columns are", names(.), "\n") } %>%
+  summarise(mean_wt_kg = mean(wt_kg))
+```
+
+---
+
+# Complete Real-World Examples
+
+## Example 1 — Full Data Analysis Pipeline
+
+```{r example-analysis}
+library(dplyr)
+library(tidyr)
+
+# Analyse sleep patterns by diet type in mammals
+msleep %>%
+  drop_na(vore, sleep_total, sleep_rem) %>%
+  group_by(vore) %>%
+  summarise(
+    n           = n(),
+    mean_sleep  = round(mean(sleep_total), 1),
+    median_rem  = round(median(sleep_rem), 1),
+    sd_sleep    = round(sd(sleep_total), 2),
+    .groups     = "drop"
+  ) %>%
+  mutate(rem_ratio = round(median_rem / mean_sleep, 2)) %>%
+  arrange(desc(mean_sleep))
+```
+
+## Example 2 — String Cleaning Pipeline
+
+```{r example-strings}
+library(stringr)
+
+raw_names <- c("  Alice SMITH ", "bob jones", "CARLA  De La Cruz", "  dr. david LEE")
+
+raw_names %>%
+  str_trim()          %>%    # remove leading/trailing whitespace
+  str_squish()        %>%    # collapse internal spaces
+  str_to_title()             # capitalise each word
+```
+
+## Example 3 — Data Reshaping Pipeline
+
+```{r example-reshape}
+library(tidyr)
+
+# Wide to long, then summarise
+mtcars %>%
+  select(cyl, mpg, hp, wt) %>%
+  pivot_longer(cols      = -cyl,
+               names_to  = "metric",
+               values_to = "value") %>%
+  group_by(cyl, metric) %>%
+  summarise(mean_val = round(mean(value), 2),
+            .groups  = "drop") %>%
+  pivot_wider(names_from  = metric,
+              values_from = mean_val)
+```
+
+## Example 4 — Visualization Pipeline
+
+```{r example-viz}
+library(ggplot2)
+
+msleep %>%
+  drop_na(vore) %>%
+  mutate(vore = factor(vore,
+                       levels = c("carni", "omni", "herbi", "insecti"))) %>%
+  ggplot(aes(x = vore, y = sleep_total, fill = vore)) +
+  geom_boxplot(alpha = 0.6) +
+  geom_jitter(width = 0.15, alpha = 0.4, size = 2) +
+  labs(title    = "Total Sleep by Diet Type",
+       subtitle = "Each point is one species",
+       x = "Diet type", y = "Sleep (hours)",
+       fill = "Diet") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+---
+
+# Quick Reference
+
+```r
+# Core pipe
+x %>% f()                    # f(x)
+x %>% f(extra_arg)           # f(x, extra_arg)
+x %>% f() %>% g() %>% h()   # h(g(f(x)))
+
+# Placeholder
+x %>% f(y, data = .)         # f(y, data = x)
+x %>% { . + 1 }              # x + 1
+
+# Assignment
+b <- x %>% f()               # compute and store
+x %<>% f()                   # modify x in place
+
+# Side effects
+x %>% f() %T>% print() %>% g()  # print after f(), continue to g()
+
+# Expose names
+df %$% plot(col1, col2)      # use column names directly
+
+# Native pipe (no package needed)
+x |> f()                     # same as x %>% f() for simple cases
+x |> (\(x) x + 1)()          # anonymous function equivalent of x %>% {. + 1}
+```
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Rewrite the following nested call as a pipe chain:  
+`round(mean(sqrt(abs(c(-4, 9, -16, 25, -36)))), digits = 2)`
+
+**Exercise 2.** Using the `starwars` dataset and a single pipeline, filter to humans only, drop rows with missing `height` or `mass`, compute BMI (`mass / (height/100)^2`), and return the top 5 characters by BMI with only their `name`, `height`, `mass`, and `bmi` columns.
+
+**Exercise 3.** Use `%T>%` to build a pipeline on `airquality` that: (1) removes rows with NAs, (2) **prints the number of remaining rows** as a side effect, (3) then computes the mean `Ozone`, `Solar.R`, `Wind`, and `Temp` with `summarise()`.
+
+**Exercise 4.** Use `%<>%` to take the vector `v <- c(5, 3, 8, 1, 9, 2, 7)` and apply the following in-place: sort it, then compute the cumulative sum.
+
+**Exercise 5.** Create a custom infix operator `%between%` that returns `TRUE` if a number falls strictly between two values. For example, `5 %between% c(3, 10)` should return `TRUE` and `15 %between% c(3, 10)` should return `FALSE`.
+
+**Exercise 6.** Build a single pipeline starting from `msleep` that: groups by `order`, computes mean `sleep_total` per order, reorders the `order` factor by mean sleep (using `forcats::fct_reorder()`), and plots a horizontal bar chart with `ggplot2` showing the top 10 sleepiest orders.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — The Pipe Function in R*

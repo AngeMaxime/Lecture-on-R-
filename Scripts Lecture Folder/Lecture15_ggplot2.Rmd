@@ -1,0 +1,774 @@
+---
+title: "Data Visualization with ggplot2"
+subtitle: "A Comprehensive Lecture — From Grammar to Publication-Ready Plots"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  comment = "##",
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 4.5
+)
+```
+
+```{r load-packages}
+library(tidyverse)   # includes ggplot2, dplyr, etc.
+```
+
+---
+
+# Introduction to ggplot2
+
+`ggplot2` is one of the most widely used packages in R, and for good reason. It produces beautiful, customizable, and reproducible graphics with a consistent and logical syntax. Once you understand how `ggplot2` works, you will rarely need to reach for Excel, GraphPad, or any other tool for your plots.
+
+`ggplot2` is based on the **Grammar of Graphics** — a systematic theory of how statistical charts are constructed. Instead of memorizing different functions for each plot type, you learn a single coherent grammar that lets you build virtually any visualization by combining a small set of components.
+
+## The Grammar of Graphics
+
+Every `ggplot2` plot is made of the following components:
+
+| Component | Description |
+|-----------|-------------|
+| **Data** | A `data.frame` containing the variables to visualize |
+| **Aesthetics (`aes()`)** | Mappings between variables and visual properties (x, y, color, size, shape, ...) |
+| **Geometries (`geom_*()`)** | The visual marks representing the data (points, lines, bars, boxes, ...) |
+| **Scales (`scale_*()`)** | Controls how data values map to visual properties |
+| **Facets (`facet_*()`)** | Splits the plot into subpanels based on a variable |
+| **Themes (`theme*()`)** | Controls all non-data visual elements (fonts, backgrounds, grids, ...) |
+| **Coordinate system** | Cartesian (default), polar, flipped, etc. |
+| **Statistical transformations (`stat`)** | Summarizes data before plotting (counts, means, bins, ...) |
+
+The basic template for any ggplot2 plot is:
+
+```r
+ggplot(data = <DATA>, aes(<MAPPINGS>)) +
+  <GEOM_FUNCTION>() +
+  <other layers>
+```
+
+> ⚠️ **Rule #1:** Your data **must** be in a `data.frame` (or `tibble`). There are no exceptions.
+
+---
+
+# Your First Plot
+
+Let's use the built-in `ChickWeight` dataset to build our first plot step by step.
+
+```{r first-look}
+head(ChickWeight)
+```
+
+## Step 1 — Initialize the canvas
+
+```{r canvas-only}
+ggplot(data = ChickWeight)
+```
+
+This creates an empty canvas. Nothing is visible yet because we have not told ggplot2 *what* to draw or *where* to put things.
+
+## Step 2 — Add aesthetic mappings
+
+```{r canvas-with-aes}
+ggplot(data = ChickWeight, aes(x = Time, y = weight))
+```
+
+Now ggplot2 knows which variables go on each axis, so it draws the axis scales. But still no data is drawn — we need a **geometry**.
+
+## Step 3 — Add a geometry layer
+
+```{r first-scatterplot}
+ggplot(data = ChickWeight, aes(x = Time, y = weight)) +
+  geom_point()
+```
+
+This is our first complete plot — a **scatterplot**. Notice the `+` operator: it adds layers to a ggplot object, just like addition.
+
+## Step 4 — Enrich with more aesthetics
+
+We can map additional variables to other visual properties inside `aes()`:
+
+```{r richer-scatterplot}
+ggplot(data = ChickWeight, aes(x = Time, y = weight, color = Diet)) +
+  geom_point(size = 3) +
+  labs(title = "Chick Weight Gain Over Time by Diet",
+       x = "Days since birth",
+       y = "Weight (g)")
+```
+
+> 💡 **Key distinction:** Aesthetics **inside `aes()`** are *mapped to a variable* (and generate a legend). Aesthetics **outside `aes()`** are *fixed values* that apply to all data points (e.g., `geom_point(color = "blue", size = 3)`).
+
+---
+
+# Core Geometry Types
+
+## Scatterplot — `geom_point()`
+
+Used to visualize the relationship between **two numerical variables**.
+
+```{r scatterplot}
+ggplot(data = ChickWeight, aes(x = Time, y = weight, color = Diet)) +
+  geom_point(size = 2, alpha = 0.6) +
+  labs(title = "Weight vs Time", x = "Time (days)", y = "Weight (g)")
+```
+
+### Adding a trend line — `geom_smooth()`
+
+```{r smooth}
+ggplot(data = ChickWeight, aes(x = Time, y = weight)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = TRUE, color = "darkred") +
+  labs(title = "Weight vs Time with Linear Trend")
+```
+
+`method = "lm"` fits a linear regression line. `se = TRUE` adds the confidence interval band. Replace `"lm"` with `"loess"` for a smooth curved fit.
+
+> ⚠️ **Where you place `color` inside `aes()` matters.** Placing it in the top-level `ggplot(aes(...))` call applies it to *all* layers. Placing it inside a specific `geom_()` layer restricts it to only that layer:
+
+```{r aes-placement}
+# color applies to points only, smooth line is a single global fit
+ggplot(data = ChickWeight, aes(x = Time, y = weight)) +
+  geom_point(aes(color = Diet), alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+## Bar Chart — `geom_bar()` and `geom_col()`
+
+`geom_bar()` is for **counting** — it computes frequencies automatically from a categorical variable.  
+`geom_col()` is used when you already have the **pre-computed values** to plot.
+
+```{r barplot}
+library(forcats)
+
+msleep %>%
+  drop_na(vore) %>%
+  ggplot(aes(x = fct_infreq(vore))) +   # fct_infreq orders bars by frequency
+  geom_bar(fill = "#97B3C6") +
+  coord_flip() +
+  theme_bw() +
+  labs(title = "Number of Animals by Diet Type",
+       x = "Diet type",
+       y = NULL)
+```
+
+### Grouped bar charts
+
+To compare two categorical variables simultaneously, map one to `x` and the other to `fill`:
+
+```{r grouped-bar}
+starwars %>%
+  filter(hair_color %in% c("black", "brown")) %>%
+  drop_na(sex) %>%
+  ggplot(aes(hair_color, fill = sex)) +
+  geom_bar(position = "dodge", alpha = 0.8) +
+  theme_bw() +
+  labs(title = "Hair Colour and Sex in Star Wars",
+       x = "Hair Colour", y = "Count")
+```
+
+`position = "dodge"` places bars side by side. Use `position = "fill"` for proportional stacked bars, or `position = "stack"` (default) for stacked counts.
+
+## Histogram — `geom_histogram()`
+
+Used to visualize the **distribution of a single numerical variable**.
+
+```{r histogram}
+msleep %>%
+  ggplot(aes(x = sleep_total)) +
+  geom_histogram(binwidth = 2, fill = "#97B3C6", color = "white") +
+  theme_bw() +
+  labs(title = "Distribution of Total Sleep in Mammals",
+       x = "Total sleep (hours)", y = "Count")
+```
+
+> ⚠️ Always set `binwidth` explicitly. The default of 30 bins is rarely optimal and ggplot2 will warn you about it.
+
+## Density Plot — `geom_density()`
+
+A smooth version of the histogram, useful for comparing distributions across groups.
+
+```{r density}
+msleep %>%
+  drop_na(vore) %>%
+  filter(vore %in% c("herbi", "omni", "carni")) %>%
+  ggplot(aes(x = sleep_total, fill = vore)) +
+  geom_density(alpha = 0.4) +
+  theme_bw() +
+  labs(title = "Sleep Distribution by Diet Type",
+       x = "Total sleep (hours)")
+```
+
+The `alpha` parameter controls transparency — essential when curves overlap.
+
+## Boxplot — `geom_boxplot()`
+
+Displays the **distribution** of a numerical variable across categories: median, quartiles, and outliers.
+
+```{r boxplot}
+ggplot(data = ChickWeight, aes(x = Diet, y = weight)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, color = "orange", alpha = 0.4) +
+  theme_bw() +
+  labs(title = "Chick Weight Distribution by Diet",
+       x = "Diet", y = "Weight (g)")
+```
+
+`geom_jitter()` adds the raw data points on top, offset slightly to avoid overlap. This reveals sample size and data spread that the boxplot alone hides.
+
+### Violin plot — `geom_violin()`
+
+A richer alternative to the boxplot, showing the full probability density:
+
+```{r violin}
+ggplot(data = iris, aes(x = Species, y = Petal.Width, fill = Species)) +
+  geom_violin(alpha = 0.5) +
+  geom_jitter(aes(color = Species), width = 0.1, alpha = 0.3) +
+  theme_bw() +
+  labs(title = "Petal Width by Iris Species")
+```
+
+## Line Graph — `geom_line()`
+
+Ideal for **time series** or any ordered sequence.
+
+```{r line-graph}
+Orange %>%
+  filter(Tree %in% c("1", "3", "5")) %>%
+  ggplot(aes(x = age, y = circumference, color = Tree)) +
+  geom_point(size = 3, alpha = 0.5) +
+  geom_line(linewidth = 1) +
+  theme_minimal() +
+  labs(title = "Orange Tree Growth Over Time",
+       x = "Age (days)", y = "Circumference (mm)")
+```
+
+## Heatmap — `geom_tile()`
+
+Visualizes a **third variable** as color across a grid of two categorical (or discrete) variables.
+
+```{r heatmap}
+# Build a simple correlation heatmap from the iris dataset
+cor_mat <- cor(iris[, 1:4])
+cor_df  <- as.data.frame(as.table(cor_mat))
+names(cor_df) <- c("Var1", "Var2", "Correlation")
+
+ggplot(cor_df, aes(x = Var1, y = Var2, fill = Correlation)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "steelblue", mid = "white",
+                       high = "darkred", midpoint = 0) +
+  theme_minimal() +
+  labs(title = "Correlation Heatmap — Iris Dataset")
+```
+
+## Area Plot — `geom_area()`
+
+Useful to compare magnitudes of overlapping groups across a continuous axis.
+
+```{r area-plot}
+ggplot(mpg, aes(x = displ)) +
+  geom_area(aes(y = hwy, fill = "Highway"), alpha = 0.6) +
+  geom_area(aes(y = cty, fill = "City"),    alpha = 0.6) +
+  labs(title = "Highway vs City Fuel Efficiency",
+       x = "Engine Displacement (L)",
+       y = "Miles per Gallon",
+       fill = "") +
+  theme_bw()
+```
+
+---
+
+# Labels and Annotations
+
+## `labs()` — Titles and axis labels
+
+```{r labs}
+ggplot(mpg, aes(x = displ, y = hwy, color = drv)) +
+  geom_point(size = 2) +
+  labs(title   = "Engine Size vs Highway Fuel Economy",
+       subtitle = "Grouped by drive type",
+       caption  = "Source: ggplot2::mpg dataset",
+       x = "Engine displacement (L)",
+       y = "Highway miles per gallon",
+       color = "Drive type") +
+  theme_bw()
+```
+
+## `annotate()` — Adding text and arrows
+
+```{r annotate}
+mtcars %>%
+  ggplot(aes(x = wt, y = mpg, color = factor(gear))) +
+  geom_point(size = 3, alpha = 0.7) +
+  annotate("text",
+           x = 4, y = 30,
+           label = "Notice the difference\nbetween 3 and 4 gear cars",
+           color = "black", size = 3.5) +
+  geom_segment(x = 4.5, y = 27, xend = 5, yend = 17,
+               arrow = arrow(length = unit(0.5, "cm")),
+               color = "darkred", linewidth = 1) +
+  labs(title = "Weight vs MPG by Number of Gears",
+       x = "Weight (1000 lbs)", y = "MPG", color = "Gears") +
+  theme_bw()
+```
+
+---
+
+# Facets — Small Multiples
+
+Facets split your data into subplots based on the values of one or two categorical variables. This is one of the most powerful features in ggplot2 for exploratory analysis.
+
+## `facet_wrap()` — Wrap panels into rows and columns
+
+```{r facet-wrap}
+ggplot(data = ChickWeight, aes(x = Time, y = weight)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ Diet) +
+  theme_bw() +
+  labs(title = "Weight over Time — One Panel per Diet")
+```
+
+Control layout with `nrow` and `ncol`:
+
+```{r facet-wrap-layout}
+library(forcats)
+
+gss_cat %>%
+  filter(partyid %in% c("Strong democrat", "Strong republican", "Independent")) %>%
+  ggplot(aes(age)) +
+  geom_histogram(binwidth = 5, fill = "steelblue", alpha = 0.8) +
+  facet_wrap(~ partyid, nrow = 1, strip.position = "bottom") +
+  labs(title = "Age distribution by political affiliation",
+       x = " ", y = " ") +
+  theme_bw()
+```
+
+## `facet_grid()` — Two-way faceting
+
+`facet_grid(rows ~ cols)` creates a full grid where rows correspond to one variable and columns to another.
+
+```{r facet-grid}
+Salaries <- car::Salaries
+
+Salaries %>%
+  mutate(discipline = factor(discipline,
+                             levels = c("A", "B"),
+                             labels = c("Agriculture", "Biology"))) %>%
+  ggplot(aes(yrs.since.phd, salary)) +
+  geom_point(aes(color = rank), alpha = 0.5) +
+  geom_smooth() +
+  facet_grid(sex ~ discipline) +
+  labs(title   = "Salary vs Years Since PhD",
+       x = "Years since PhD",
+       y = "Salary (USD)",
+       color = "Position") +
+  theme_bw()
+```
+
+---
+
+# Scales
+
+Scales control the mapping from data values to visual properties. Every aesthetic has a corresponding scale that can be customized.
+
+## Axis scales — `scale_x_*()` and `scale_y_*()`
+
+```{r axis-scale}
+ggplot(iris, aes(x = Sepal.Width, y = Sepal.Length)) +
+  geom_point() +
+  scale_x_continuous(name   = "Sepal Width (cm)",
+                     breaks = seq(2, 5, by = 0.5),
+                     limits = c(2, 5)) +
+  scale_y_continuous(name   = "Sepal Length (cm)") +
+  theme_bw()
+```
+
+## Renaming tick labels — `scale_x_discrete()`
+
+```{r discrete-scale}
+Salaries %>%
+  ggplot(aes(x = rank, y = salary, fill = sex)) +
+  geom_boxplot(alpha = 0.5) +
+  scale_x_discrete(labels = c("AsstProf"  = "Assistant\nProfessor",
+                               "AssocProf" = "Associate\nProfessor",
+                               "Prof"      = "Full\nProfessor")) +
+  labs(title = "Salary by Academic Rank and Gender",
+       x = "", y = "Salary (USD)", fill = "Gender") +
+  theme_bw()
+```
+
+## Color scales — `scale_color_*()` and `scale_fill_*()`
+
+### Discrete (categorical) colors
+
+```{r color-brewer}
+mpg %>%
+  ggplot(aes(displ, hwy, color = drv)) +
+  geom_jitter(size = 3) +
+  scale_color_brewer(palette = "Set2") +
+  theme_minimal() +
+  labs(title = "Fuel Economy by Drive Type (ColorBrewer palette)")
+```
+
+### Manual colors
+
+```{r manual-color}
+mpg %>%
+  ggplot(aes(displ, hwy, color = drv)) +
+  geom_jitter(size = 3) +
+  scale_color_manual(values = c("4" = "#719AC9",
+                                "f" = "#75B99C",
+                                "r" = "#C98071")) +
+  theme_minimal() +
+  labs(title = "Fuel Economy — Manual Hex Colors")
+```
+
+> 💡 Find hex color codes at **htmlcolorcodes.com**. Use `display.brewer.all(colorblindFriendly = TRUE)` from the `RColorBrewer` package to see all colorblind-safe palettes.
+
+### Continuous (gradient) colors
+
+```{r gradient-color}
+ggplot(iris, aes(x = Sepal.Width, y = Sepal.Length,
+                 color = Petal.Length)) +
+  geom_point(size = 3) +
+  scale_color_gradient(low = "blue", high = "red") +
+  theme_bw() +
+  labs(title = "Sepal Dimensions Colored by Petal Length")
+```
+
+---
+
+# Themes
+
+Themes control all non-data visual elements: text, backgrounds, grid lines, axis lines, legend appearance, etc.
+
+## Built-in themes
+
+```{r themes-showcase, fig.width=9, fig.height=6}
+p <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(x = "Weight", y = "MPG")
+
+library(patchwork)
+(p + ggtitle("theme_bw()")      + theme_bw())      +
+(p + ggtitle("theme_classic()") + theme_classic())  +
+(p + ggtitle("theme_minimal()") + theme_minimal())  +
+(p + ggtitle("theme_dark()")    + theme_dark())
+```
+
+## `theme_set()` — Apply a theme globally
+
+Set your preferred theme once at the top of your script:
+
+```{r theme-set, eval=FALSE}
+theme_set(theme_bw())   # All subsequent plots use theme_bw()
+```
+
+## Customizing with `theme()`
+
+The `theme()` function gives granular control over every visual element:
+
+```{r custom-theme}
+ggplot(mtcars, aes(wt, mpg, color = factor(cyl))) +
+  geom_point(size = 3) +
+  labs(title = "A Customized Plot",
+       x = "Weight (1000 lbs)",
+       y = "Miles per Gallon",
+       color = "Cylinders") +
+  theme_bw() +
+  theme(
+    plot.title    = element_text(size = 16, face = "bold",
+                                  color = "steelblue", hjust = 0.5),
+    axis.title    = element_text(size = 12, color = "steelblue"),
+    legend.position = c(0.85, 0.80),
+    panel.grid.minor = element_blank()
+  )
+```
+
+Key `theme()` arguments:
+
+| Element | What it controls |
+|---------|-----------------|
+| `plot.title` | The plot title text |
+| `axis.title.x/y` | Axis label text |
+| `axis.text.x/y` | Axis tick labels |
+| `axis.line.x/y` | Axis lines |
+| `panel.background` | The plot area background |
+| `plot.background` | The entire figure background |
+| `panel.grid.major/minor` | Grid lines |
+| `legend.position` | Legend location (`"top"`, `"bottom"`, `"none"`, or `c(x, y)`) |
+| `strip.text` | Facet panel labels |
+
+---
+
+# Error Bars — `geom_errorbar()`
+
+Displaying uncertainty is critical in scientific visualization.
+
+```{r error-bars}
+ToothGrowth %>%
+  filter(supp == "VC") %>%
+  mutate(dose_f = as.factor(dose)) %>%
+  group_by(dose_f) %>%
+  summarise(mean_len = mean(len), sd_len = sd(len)) %>%
+  ggplot(aes(dose_f, mean_len)) +
+  geom_point(size = 4, color = "steelblue") +
+  geom_errorbar(aes(ymin = mean_len - sd_len,
+                    ymax = mean_len + sd_len),
+                width = 0.08) +
+  labs(title = "Average Tooth Growth by Dose (Supplement: VC)",
+       x = "Dose (mg/day)", y = "Mean tooth length") +
+  theme_bw()
+```
+
+You can combine error bars with bar charts too:
+
+```{r error-bars-bar}
+ToothGrowth %>%
+  filter(supp == "VC") %>%
+  mutate(dose_f = as.factor(dose)) %>%
+  group_by(dose_f) %>%
+  summarise(mean_len = mean(len), sd_len = sd(len)) %>%
+  ggplot(aes(dose_f, mean_len)) +
+  geom_bar(stat = "identity", fill = "skyblue", alpha = 0.7) +
+  geom_errorbar(aes(ymin = mean_len - sd_len,
+                    ymax = mean_len + sd_len),
+                width = 0.08) +
+  labs(title = "Average Tooth Growth — Bar Chart with Error Bars",
+       x = "Dose (mg/day)", y = "Mean tooth length") +
+  theme_bw()
+```
+
+---
+
+# Lollipop Chart
+
+A lollipop chart is a clean alternative to bar charts for comparing ranked values. It combines `geom_segment()` and `geom_point()`.
+
+```{r lollipop}
+msleep %>%
+  group_by(order) %>%
+  summarise(mean_sleep = mean(sleep_total)) %>%
+  mutate(order = fct_reorder(order, mean_sleep)) %>%
+  ggplot(aes(x = order, y = mean_sleep)) +
+  geom_hline(yintercept = mean(msleep$sleep_total),
+             color = "grey50", linewidth = 0.8) +
+  geom_segment(aes(x = order, xend = order,
+                   y = mean(msleep$sleep_total),
+                   yend = mean_sleep),
+               color = "grey70") +
+  geom_point(aes(color = mean_sleep), size = 4) +
+  scale_color_gradient(low = "steelblue", high = "orange") +
+  coord_flip() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        legend.position  = "none") +
+  labs(title = "Average Sleep Time of Mammals by Order",
+       x = "", y = "Hours of sleep")
+```
+
+---
+
+# Combining Multiple Plots — `patchwork`
+
+The `patchwork` package lets you compose multiple ggplot objects into one figure.
+
+```{r patchwork}
+library(patchwork)
+
+p1 <- ggplot(iris, aes(Sepal.Length, Sepal.Width, color = Species)) +
+  geom_point() + theme_bw() + labs(title = "Scatter")
+
+p2 <- ggplot(iris, aes(x = Species, y = Sepal.Length, fill = Species)) +
+  geom_boxplot() + theme_bw() + labs(title = "Boxplot")
+
+p3 <- ggplot(iris, aes(x = Sepal.Length, fill = Species)) +
+  geom_density(alpha = 0.4) + theme_bw() + labs(title = "Density")
+
+# Layout: p1 on top, p2 and p3 side by side on the bottom
+p1 / (p2 + p3) +
+  plot_annotation(title = "Iris Dataset — Three Views",
+                  theme = theme(plot.title = element_text(hjust = 0.5,
+                                                          face = "bold")))
+```
+
+Operators: `+` places side by side, `/` places one on top of the other.
+
+---
+
+# Animated Plots — `gganimate`
+
+`gganimate` extends ggplot2 to create animated GIFs or videos by adding a time dimension.
+
+```{r gganimate-demo, eval=FALSE}
+library(gganimate)
+library(gapminder)
+
+ggplot(gapminder,
+       aes(x = gdpPercap, y = lifeExp, size = pop, color = continent)) +
+  geom_point(alpha = 0.7) +
+  scale_x_log10() +
+  labs(title = "Year: {frame_time}",
+       x = "GDP per Capita", y = "Life Expectancy") +
+  theme_bw() +
+  transition_time(year)   # <-- the gganimate layer
+
+# Save as GIF:
+# anim_save("gapminder.gif")
+```
+
+Key `gganimate` functions:
+
+| Function | Purpose |
+|----------|---------|
+| `transition_time(var)` | Animate over a continuous time variable |
+| `transition_states(var)` | Animate over discrete states |
+| `transition_reveal(var)` | Progressively reveal data along a variable |
+| `anim_save("file.gif")` | Save the animation as a GIF |
+
+---
+
+# Saving Plots — `ggsave()`
+
+```{r ggsave-demo, eval=FALSE}
+my_plot <- ggplot(iris, aes(Sepal.Length, Sepal.Width, color = Species)) +
+  geom_point(size = 2) +
+  theme_bw()
+
+# Save to a file — most common parameters:
+ggsave("my_plot.png",
+       plot   = my_plot,   # omit to save the last plot
+       width  = 10,
+       height = 7,
+       units  = "cm",
+       dpi    = 300)       # 300 dpi for publication quality
+
+# PDF format (vector, infinitely scalable):
+ggsave("my_plot.pdf", width = 10, height = 7)
+```
+
+You can also use the classic approach with `png()` / `pdf()` + `dev.off()`:
+
+```{r dev-off-demo, eval=FALSE}
+pdf("my_plot2.pdf", width = 8, height = 6)
+print(my_plot)
+dev.off()
+```
+
+---
+
+# A Bioinformatics Application
+
+Here is how the ggplot2 grammar applies directly to gene expression data. The code below illustrates the patterns — assume `dat.long` is a long-format RNA-seq data frame with columns `gene`, `samples`, `FPKM`, `tissue`, and `metastasis`.
+
+```{r bioinformatics, eval=FALSE}
+# 1 — Bar chart: BRCA1 expression by sample, colored by tissue type
+dat.long %>%
+  filter(gene == "BRCA1") %>%
+  ggplot(aes(x = samples, y = FPKM, fill = tissue)) +
+  geom_col() +
+  labs(title = "BRCA1 Expression by Sample",
+       x = "Sample", y = "FPKM") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# 2 — Density: BRCA1 expression distribution in normal vs tumor tissue
+dat.long %>%
+  filter(gene == "BRCA1") %>%
+  ggplot(aes(x = FPKM, fill = tissue)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "BRCA1 Expression Density by Tissue Type") +
+  theme_bw()
+
+# 3 — Boxplot: expression by metastasis status
+dat.long %>%
+  filter(gene == "BRCA1") %>%
+  ggplot(aes(x = metastasis, y = FPKM)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.15, alpha = 0.3, color = "tomato") +
+  labs(title = "BRCA1 Expression by Metastasis Status") +
+  theme_bw()
+
+# 4 — Scatterplot with regression line: BRCA1 vs BRCA2
+dat.long %>%
+  filter(gene %in% c("BRCA1", "BRCA2")) %>%
+  spread(key = gene, value = FPKM) %>%
+  ggplot(aes(x = BRCA1, y = BRCA2, color = tissue)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "BRCA1 vs BRCA2 Expression Correlation") +
+  theme_bw()
+
+# 5 — Heatmap: multiple genes across all samples
+genes.of.interest <- c("BRCA1", "BRCA2", "TP53", "ALK", "MYCN")
+dat.long %>%
+  filter(gene %in% genes.of.interest) %>%
+  ggplot(aes(x = samples, y = gene, fill = FPKM)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(title = "Gene Expression Heatmap") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+---
+
+# Quick Reference — Common geoms
+
+| `geom_*` | Best for |
+|----------|---------|
+| `geom_point()` | Two continuous variables (scatter) |
+| `geom_jitter()` | Scatter with overlap (adds random noise) |
+| `geom_line()` | Time series, ordered sequences |
+| `geom_bar()` | Counts of a categorical variable |
+| `geom_col()` | Pre-computed bar heights |
+| `geom_histogram()` | Distribution of one numeric variable |
+| `geom_density()` | Smoothed distribution |
+| `geom_boxplot()` | Distribution summary + outliers |
+| `geom_violin()` | Full distribution shape |
+| `geom_tile()` | Heatmaps |
+| `geom_area()` | Area under a curve |
+| `geom_smooth()` | Trend/regression line |
+| `geom_errorbar()` | Uncertainty/confidence intervals |
+| `geom_segment()` | Custom line segments |
+| `geom_hline()` / `geom_vline()` | Reference lines |
+| `annotate()` | Custom text or shapes |
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Using the built-in `Indometh` dataset, make a scatterplot of `time` vs `conc`, then a boxplot of `conc` by `Subject`, and finally a faceted version showing one panel per subject.
+
+**Exercise 2.** Using `msleep`, create a density plot showing the distribution of `sleep_total` for carnivores and herbivores side by side (use `fill` and `alpha`).
+
+**Exercise 3.** Using the `esoph` dataset, calculate the frequency of esophageal cancer per observation (`ncases / (ncases + ncontrols)`) and make three separate boxplots to compare this frequency by `agegp`, `alcgp`, and `tobgp`. Add jitter to each.
+
+**Exercise 4.** Using `gapminder` (install if needed), filter to Africa and Europe and create a faceted scatterplot of `gdpPercap` vs `lifeExp`, with point size proportional to `pop` and color encoding `year`. Apply `theme_bw()`.
+
+**Exercise 5.** Customize any plot you've made by modifying: the title color and size, the axis label font style, the legend position, and the panel background. Use the `theme()` function.
+
+**Exercise 6.** Use `patchwork` to combine two different plots about the same dataset into a single figure with a shared title.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Data Visualization with ggplot2*

@@ -1,0 +1,462 @@
+---
+title: "Lecture 10: Manipulating Text Data in R with {stringr}"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center"
+)
+```
+
+---
+
+# Learning Objectives
+
+By the end of this lecture, you will be able to:
+
+- Explain why string manipulation is essential in data science workflows
+- Use the core `{stringr}` functions: `str_detect()`, `str_c()`, `str_sub()`, `str_split()`, `str_locate()`, `str_to_upper()`, `str_to_lower()`, and `str_replace()`
+- Combine string operations with `{dplyr}` verbs (`mutate()`, `filter()`, `select()`) in a tidyverse pipeline
+- Extract first names from full names using `str_locate()` + `str_sub()`
+- Present clean results using `{gt}` and `{gtExtras}` publication-ready tables
+
+---
+
+# Why String Manipulation Matters
+
+Real-world data is messy. Names, IDs, labels, addresses, and free-text fields rarely arrive in a clean, analysis-ready format. Text manipulation is therefore one of the most commonly needed data wrangling skills.
+
+> *"80% of data science work is data cleaning — and a large part of cleaning involves text."*
+
+## Common text data problems you will encounter
+
+| Problem | Example | Solution |
+|---|---|---|
+| Inconsistent capitalisation | `"human"` vs `"Human"` | `str_to_upper()` / `str_to_lower()` |
+| Need to detect a pattern | Find all cars with "M" in name | `str_detect()` |
+| Need to split a field | Split full name into first + last | `str_split()` / `str_locate()` + `str_sub()` |
+| Need to shorten labels | Use first 3 characters of model | `str_sub()` |
+| Need to combine fields | Create a description column | `str_c()` |
+| Need to replace text | Remove unwanted characters | `str_replace()` / `str_replace_all()` |
+
+---
+
+# Required Packages
+
+```{r load-packages}
+library(tidyverse)   # includes stringr, dplyr, tibble
+library(gt)          # Publication-quality tables
+library(gtExtras)    # Extra themes for gt tables
+```
+
+---
+
+# The `{stringr}` Function Family
+
+All `{stringr}` functions follow a consistent naming convention: they begin with `str_` followed by a descriptive verb. This makes them easy to discover and remember.
+
+```{r stringr-overview, echo=FALSE}
+tibble::tibble(
+  Function         = c("str_detect()", "str_c()", "str_sub()",
+                       "str_split()", "str_locate()", "str_to_upper()",
+                       "str_to_lower()", "str_replace()", "str_length()",
+                       "str_trim()"),
+  Purpose          = c("Test if a pattern exists → returns TRUE/FALSE",
+                       "Concatenate (join) strings",
+                       "Extract a substring by character position",
+                       "Split a string into parts",
+                       "Find the position of a pattern",
+                       "Convert to UPPER CASE",
+                       "Convert to lower case",
+                       "Replace first match of a pattern",
+                       "Count the number of characters",
+                       "Remove leading/trailing whitespace"),
+  `Returns`        = c("logical", "character", "character",
+                       "list", "matrix (start, end)", "character",
+                       "character", "character", "integer", "character")
+) |>
+  gt() |>
+  tab_header(title = "Core {stringr} Functions") |>
+  cols_align("left") |>
+  gt_theme_538()
+```
+
+---
+
+# Tutorial 1 — Detecting Patterns with `str_detect()`
+
+## Goal
+
+Filter the `mtcars` dataset to keep only car models whose name contains the letter **"M"**.
+
+## Step-by-step explanation
+
+```{r str-detect-steps}
+mtcars |>
+  rownames_to_column(var = "model") |>   # Move row names into a column
+  mutate(
+    has_M = str_detect(model, "M")       # TRUE if "M" appears anywhere in model
+  ) |>
+  filter(has_M == TRUE) |>               # Keep only rows where has_M is TRUE
+  select(model, mpg, cyl, disp) |>       # Select relevant columns
+  head(10)
+```
+
+> **How `str_detect()` works:**  
+> `str_detect(string, pattern)` returns `TRUE` if `pattern` is found inside `string`, and `FALSE` otherwise. The pattern is case-sensitive by default — `"M"` will find "Maserati" but not "mercedes".
+
+## Publication-quality table with {gt}
+
+```{r str-detect-gt}
+mtcars |>
+  rownames_to_column(var = "model") |>
+  mutate(has_M = str_detect(model, "M")) |>
+  filter(has_M == TRUE) |>
+  select(model, mpg, cyl, disp) |>
+  gt() |>
+  tab_header(
+    title    = "Cars whose name contains the letter M",
+    subtitle = "Filtered using str_detect() from {stringr}"
+  ) |>
+  cols_align(align = "left") |>
+  cols_label(model = "Model", mpg = "MPG", cyl = "Cylinders", disp = "Displacement") |>
+  gt_theme_538()
+```
+
+## Case-insensitive detection
+
+To catch both `"M"` and `"m"`, use a regex with `(?i)`:
+
+```{r str-detect-insensitive}
+mtcars |>
+  rownames_to_column(var = "model") |>
+  mutate(has_m = str_detect(model, "(?i)m")) |>   # (?i) = case-insensitive
+  filter(has_m) |>
+  select(model, mpg, cyl) |>
+  head(8)
+```
+
+---
+
+# Tutorial 2 — Splitting Strings with `str_split()`
+
+## Goal
+
+Split Star Wars character names at the **space** to separate first name from the rest.
+
+```{r str-split-demo}
+starwars |>
+  mutate(
+    name_parts = str_split(name, " ")   # Split at every space; returns a list
+  ) |>
+  select(name, name_parts) |>
+  head(8)
+```
+
+> `str_split()` returns a **list column** — each element is a character vector of the parts. This is useful when names have a variable number of parts (first name only, first + last, first + middle + last, etc.).
+
+## Extracting just the first element of the split
+
+```{r str-split-first}
+starwars |>
+  mutate(
+    first_name = sapply(str_split(name, " "), `[`, 1)  # Take first element
+  ) |>
+  select(name, first_name) |>
+  head(10)
+```
+
+---
+
+# Tutorial 3 — Core String Functions on the `iris` and `mtcars` Datasets
+
+## `str_c()` — Concatenating Strings
+
+`str_c()` pastes text values together, with full control over the separator and any additional text you want to insert.
+
+```{r str-c-demo}
+iris |>
+  select(Species, Sepal.Length) |>
+  mutate(
+    Description = str_c(
+      Species,       # First piece of text
+      ": ",          # Separator (literal text)
+      Sepal.Length,  # Second piece of text
+      " cm"          # Units appended at the end
+    )
+  ) |>
+  head(10)
+```
+
+```{r str-c-gt}
+iris |>
+  select(Species, Sepal.Length) |>
+  mutate(
+    Description = str_c(Species, ": ", Sepal.Length, " cm")
+  ) |>
+  head(15) |>
+  gt() |>
+  tab_header(
+    title    = "Iris data with Description column",
+    subtitle = "Created using str_c()"
+  ) |>
+  cols_align("left") |>
+  gt_theme_538()
+```
+
+## `str_sub()` — Extracting a Substring by Position
+
+`str_sub(string, start, end)` extracts the characters from position `start` to position `end` (inclusive).
+
+```{r str-sub-demo}
+mtcars |>
+  rownames_to_column(var = "model") |>
+  mutate(
+    short_name = str_sub(model, 1, 3)   # Characters 1 to 3
+  ) |>
+  select(model, short_name, mpg, cyl, disp) |>
+  head(10)
+```
+
+```{r str-sub-gt}
+mtcars |>
+  rownames_to_column(var = "model") |>
+  mutate(short_name = str_sub(model, 1, 3)) |>
+  select(model, short_name, mpg, cyl, disp) |>
+  gt() |>
+  tab_header(
+    title    = "Models and their 3-character abbreviations",
+    subtitle = "Created using str_sub(start = 1, end = 3)"
+  ) |>
+  cols_align("left") |>
+  gt_theme_538()
+```
+
+> **Tip:** You can use negative indices to extract from the **end** of a string. `str_sub(model, -3, -1)` extracts the last 3 characters.
+
+## `str_to_upper()` — Changing Case
+
+```{r str-to-upper}
+starwars |>
+  select(name, species) |>
+  mutate(
+    species_upper = str_to_upper(species),    # All capitals
+    species_lower = str_to_lower(species),    # All lowercase
+    species_title = str_to_title(species)     # Title Case
+  ) |>
+  head(10)
+```
+
+```{r str-to-upper-gt}
+starwars |>
+  select(name, species) |>
+  mutate(species = str_to_upper(species)) |>
+  head(15) |>
+  gt() |>
+  tab_header(
+    title    = "Star Wars characters — Species in UPPER CASE",
+    subtitle = "Transformed using str_to_upper()"
+  ) |>
+  cols_align("left") |>
+  gt_theme_538()
+```
+
+---
+
+# Tutorial 4 — Locating Patterns with `str_locate()`
+
+## Goal
+
+Extract only the **first name** of each Star Wars Human character by finding the position of the space and extracting everything before it.
+
+## How `str_locate()` works
+
+`str_locate(string, pattern)` returns a two-column **matrix** with `start` and `end` positions of the first match.
+
+```{r str-locate-demo}
+# Step 1: See the positions of the first space in each name
+starwars |>
+  pull(name) |>                        # Extract the name column as a vector
+  str_locate(" ") |>                   # Find position of first space
+  head(10)
+```
+
+> The output shows `start` and `end` columns. For a single-character pattern like `" "` (space), `start` and `end` are always the same position.
+
+## Extracting first names using `str_locate()` + `str_sub()`
+
+```{r str-locate-first-name}
+starwars |>
+  filter(species == "Human") |>
+  mutate(
+    first_name = str_sub(
+      name,
+      start = 1,
+      end   = str_locate(name, " ")[, 1] - 1  # One position before the space
+    )
+  ) |>
+  select(name, first_name) |>
+  head(15)
+```
+
+**How the indexing works:**
+
+- `str_locate(name, " ")` returns a matrix for each row
+- `[, 1]` extracts the `start` column (position of the space)
+- `- 1` moves one position back — the last character of the first name
+
+```{r str-locate-gt}
+starwars |>
+  filter(species == "Human") |>
+  mutate(
+    first_name = str_sub(name, 1, str_locate(name, " ")[, 1] - 1)
+  ) |>
+  select(name, first_name) |>
+  gt() |>
+  tab_header(
+    title    = "First names of Star Wars Human characters",
+    subtitle = "Extracted with str_locate() + str_sub()"
+  ) |>
+  cols_align("left") |>
+  gt_theme_538()
+```
+
+---
+
+# Tutorial 5 — Combining Strings with `str_c()` (Scalars and Vectors)
+
+## Scalar combination
+
+```{r str-c-scalar}
+first_name <- "John"
+last_name  <- "Earl"
+
+full_name <- str_c(first_name, last_name, sep = " ")
+cat("Full name:", full_name, "\n")
+```
+
+## Vector combination
+
+```{r str-c-vector}
+first_names <- c("John", "Keith", "Alice")
+last_names  <- c("Earl", "Martin", "Walker")
+
+full_names <- str_c(first_names, last_names, sep = " ")
+print(full_names)
+```
+
+## Creating a new column with `str_c()` in a pipeline
+
+```{r str-c-pipeline}
+iris |>
+  select(Species, Sepal.Length) |>
+  mutate(
+    Description = str_c(Species, " : ", Sepal.Length, " cm")
+  ) |>
+  gt() |>
+  tab_header(
+    title    = "Iris data with Description column",
+    subtitle = "str_c() combining Species, separator, Sepal.Length, and unit"
+  ) |>
+  cols_align("center") |>
+  gt_theme_538()
+```
+
+---
+
+# Tutorial 6 — Additional Useful Functions
+
+## `str_replace()` — Replacing Patterns
+
+```{r str-replace}
+starwars |>
+  select(name) |>
+  mutate(
+    name_no_space = str_replace(name, " ", "_"),         # Replace first space
+    name_all_dash = str_replace_all(name, " ", "-")      # Replace ALL spaces
+  ) |>
+  head(10)
+```
+
+## `str_length()` — Counting Characters
+
+```{r str-length}
+starwars |>
+  select(name) |>
+  mutate(name_length = str_length(name)) |>
+  arrange(desc(name_length)) |>                          # Longest names first
+  head(10)
+```
+
+## `str_trim()` — Removing Whitespace
+
+```{r str-trim}
+messy_names <- c("  Luke Skywalker  ", "Darth Vader ", " Leia Organa")
+clean_names <- str_trim(messy_names)                      # Remove leading/trailing spaces
+
+tibble(messy = messy_names, clean = clean_names)
+```
+
+## `str_pad()` — Padding Strings to a Fixed Width
+
+Useful for creating standardised ID codes:
+
+```{r str-pad}
+ids <- c(1, 5, 42, 100, 999)
+padded_ids <- str_pad(ids, width = 4, side = "left", pad = "0")
+
+tibble(original = ids, padded = padded_ids)
+```
+
+---
+
+# Summary
+
+| Function | Syntax | Key use case |
+|---|---|---|
+| `str_detect()` | `str_detect(string, pattern)` | Filter rows by text pattern |
+| `str_c()` | `str_c(..., sep = " ")` | Build description or label columns |
+| `str_sub()` | `str_sub(string, start, end)` | Extract characters by position |
+| `str_split()` | `str_split(string, pattern)` | Split a string into parts |
+| `str_locate()` | `str_locate(string, pattern)` | Find position of a pattern |
+| `str_to_upper()` | `str_to_upper(string)` | Standardise capitalisation |
+| `str_replace()` | `str_replace(string, pattern, replacement)` | Clean or recode values |
+| `str_length()` | `str_length(string)` | Count characters |
+| `str_trim()` | `str_trim(string)` | Remove accidental whitespace |
+| `str_pad()` | `str_pad(string, width, side, pad)` | Create fixed-width ID codes |
+
+---
+
+# Practice Exercises
+
+1. Using `mtcars`, create a column `brand` that extracts only the **first word** of each model name (e.g., `"Mazda"` from `"Mazda RX4"`). Use `str_split()` or `str_locate()` + `str_sub()`.
+
+2. In the `starwars` dataset, use `str_detect()` to find all characters whose name contains the string `"Darth"`. How many are there?
+
+3. Using `iris`, create a new column `label` that looks like: `"setosa_5.1cm"` (species + underscore + Sepal.Length + "cm"). Use `str_c()` and `str_to_lower()`.
+
+4. From the `starwars` dataset, extract the **last name** of all Human characters (the part of the name after the last space). Use `str_locate()` and `str_sub()`.
+
+5. *Challenge:* Use `str_replace_all()` to remove all vowels (a, e, i, o, u — case-insensitive) from car model names in `mtcars`. Which model name becomes empty?
+
+---
+
+# References
+
+- Wickham, H. (2022). *{stringr}: Simple, Consistent Wrappers for Common String Operations*. https://stringr.tidyverse.org
+- Wickham, H. & Grolemund, G. (2017). *R for Data Science*, Chapter 14: Strings. https://r4ds.had.co.nz/strings.html
+- Regular expressions reference: https://regexr.com

@@ -1,0 +1,530 @@
+---
+title: "Nettoyage et Prétraitement des Données"
+subtitle: "Valeurs manquantes, doublons, valeurs aberrantes et mise à l'échelle"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE, message = FALSE, warning = FALSE)
+```
+
+---
+
+# Introduction : Pourquoi prétraiter les données ?
+
+Le prétraitement des données est une étape **indispensable** avant toute analyse statistique ou modélisation. Des données brutes contiennent presque toujours des imperfections qui compromettent la qualité des résultats.
+
+Un bon prétraitement garantit :
+
+- **La qualité des données** — suppression des erreurs, incohérences et bruit
+- **La performance des modèles** — des données propres améliorent directement la précision
+- **L'interprétabilité** — des variables bien formatées facilitent la lecture des résultats
+- **La cohérence** — les mêmes transformations appliquées de façon reproductible
+
+## Étapes générales du prétraitement
+
+```
+1. Importer les librairies et les données
+2. Détecter et traiter les doublons
+3. Gérer les valeurs manquantes
+4. Encoder les variables catégorielles
+5. Gérer les types de données
+6. Traiter les valeurs aberrantes (outliers)
+7. Mettre les variables à l'échelle (feature scaling)
+8. Équilibrer les classes si nécessaire
+```
+
+---
+
+# Importer les librairies essentielles
+
+```{r librairies-python, eval=FALSE}
+# Python — librairies standards pour le prétraitement
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+
+warnings.filterwarnings('ignore')
+sns.set()                  # Thème seaborn par défaut
+%matplotlib inline         # Affichage des graphiques dans le notebook
+```
+
+```{r librairies-r}
+# R — librairies équivalentes
+library(dplyr)      # Manipulation des données
+library(tidyr)      # Restructuration
+library(ggplot2)    # Visualisation
+library(skimr)      # Résumé des données
+library(dlookr)     # Diagnostic et rapport
+```
+
+---
+
+# Détecter et supprimer les doublons
+
+Les doublons sont des lignes répétées dans le jeu de données. Ils faussent les statistiques descriptives et les modèles en **surpondérant** certaines observations.
+
+## En Python (pandas)
+
+```python
+# Vérifier l'existence de doublons
+df.duplicated().sum()
+
+# Supprimer les doublons
+df.drop_duplicates(inplace=True)
+```
+
+## En R
+
+```{r doublons-r}
+# Vérifier le nombre de lignes dupliquées
+sum(duplicated(df))
+
+# Supprimer les doublons
+df <- df[!duplicated(df), ]
+
+# Avec dplyr
+df <- df %>% distinct()
+```
+
+> ⚠️ **Ne pas supposer que les données sont propres.** Les doublons sont fréquents lors de fusions de bases de données ou d'exports répétés.
+
+---
+
+# Gérer les valeurs manquantes
+
+## Qu'est-ce qu'une valeur manquante ?
+
+Une valeur manquante est une cellule vide dans un tableau de données. Elle peut survenir suite à une **collecte incomplète**, une **erreur de saisie**, ou un **refus de répondre**. En Python, elles sont représentées par `NaN` (*Not a Number*) ; en R, par `NA`.
+
+Laisser des valeurs manquantes sans traitement **biaise les calculs** et provoque des erreurs dans les modèles.
+
+## Identifier les valeurs manquantes
+
+```python
+# Python : détecter les valeurs manquantes
+df.isnull()              # Tableau de True/False
+df.isnull().sum()        # Nombre par colonne
+df.isnull().sum() / len(df) * 100  # Proportion en %
+```
+
+```{r vm-r}
+# R : détecter les valeurs manquantes
+is.na(df)                          # Matrice logique
+colSums(is.na(df))                 # Nombre par colonne
+colMeans(is.na(df)) * 100          # Proportion en %
+
+# Avec skimr (plus complet)
+skim(df)
+```
+
+## Stratégies de traitement
+
+Le choix de la stratégie dépend du **taux de valeurs manquantes** et de la **nature de la variable** :
+
+| Situation                               | Stratégie recommandée               |
+|-----------------------------------------|--------------------------------------|
+| Taux > 25 %                             | Supprimer la variable                |
+| Variable numérique, sans outliers       | Imputer par la **moyenne**           |
+| Variable numérique, avec outliers       | Imputer par la **médiane**           |
+| Variable catégorielle                   | Imputer par le **mode**              |
+| Données temporelles ou ordonnées        | Propagation avant/arrière (ffill/bfill) |
+| Données complexes                       | Imputation par **KNN** ou modèle     |
+
+### Suppression des lignes ou colonnes
+
+```python
+# Python : supprimer les lignes avec valeurs manquantes
+df_cleaned = df.dropna()           # Toutes les lignes avec NA
+
+# Supprimer les colonnes avec valeurs manquantes
+df_cleaned = df.dropna(axis=1)
+```
+
+```{r drop-na-r}
+# R : supprimer les lignes avec NA
+df_cleaned <- na.omit(df)
+
+# Supprimer une colonne entière
+df <- df %>% select(-nom_colonne)
+```
+
+> ⚠️ La suppression systématique entraîne une **perte d'information**. À n'utiliser que si le taux de NA est faible ou si la colonne est peu informative.
+
+### Imputation par la moyenne, médiane ou mode
+
+```python
+# Python : imputation numérique
+df['Salary'].fillna(df['Salary'].mean(),   inplace=True)   # Moyenne
+df['Salary'].fillna(df['Salary'].median(), inplace=True)   # Médiane
+
+# Imputation catégorielle (mode)
+df['City'].fillna(df['City'].mode()[0], inplace=True)
+```
+
+```{r imputation-r}
+# R : imputation numérique
+df$Salary[is.na(df$Salary)] <- mean(df$Salary, na.rm = TRUE)   # Moyenne
+df$Salary[is.na(df$Salary)] <- median(df$Salary, na.rm = TRUE) # Médiane
+
+# Avec dplyr
+df <- df %>%
+  mutate(Salary = ifelse(is.na(Salary), median(Salary, na.rm = TRUE), Salary))
+```
+
+### Propagation avant et arrière (données ordonnées)
+
+```python
+# Python : forward fill et backward fill
+df.fillna(method='ffill', inplace=True)   # Valeur précédente
+df.fillna(method='bfill', inplace=True)   # Valeur suivante
+```
+
+```{r fill-r}
+# R : avec tidyr
+df <- df %>% fill(colonne, .direction = "down")   # Forward fill
+df <- df %>% fill(colonne, .direction = "up")     # Backward fill
+```
+
+### Interpolation linéaire
+
+```python
+# Python : interpolation
+df['Salary'].interpolate(method='linear', inplace=True)
+```
+
+```{r interpolation-r}
+# R
+df$Salary <- zoo::na.approx(df$Salary)
+```
+
+---
+
+# Encoder les variables catégorielles
+
+Les modèles statistiques et d'apprentissage automatique nécessitent des **entrées numériques**. Les variables catégorielles doivent donc être transformées.
+
+## Label Encoding (variables ordinales)
+
+Attribue un entier unique à chaque catégorie. À utiliser uniquement quand il existe un **ordre naturel** (ex. : faible < moyen < élevé).
+
+```python
+# Python
+dataset['niveau'] = dataset['niveau'].astype('category')
+dataset['niveau'] = dataset['niveau'].cat.codes
+```
+
+```{r label-encoding-r}
+# R
+df$niveau <- as.numeric(factor(df$niveau,
+                                levels = c("faible", "moyen", "élevé")))
+```
+
+## One-Hot Encoding (variables nominales)
+
+Crée une colonne binaire par modalité. À utiliser quand il n'y a **pas d'ordre** entre les catégories (ex. : couleurs, villes).
+
+```python
+# Python
+df = pd.get_dummies(df, columns=['Ville'])
+# Toujours supprimer une colonne pour éviter la multicolinéarité
+df = pd.get_dummies(df, columns=['Ville'], drop_first=True)
+```
+
+```{r ohe-r}
+# R : avec model.matrix
+df_encoded <- model.matrix(~ Ville - 1, data = df)
+
+# Ou avec dummies (package fastDummies)
+library(fastDummies)
+df <- dummy_cols(df, select_columns = "Ville", remove_first_dummy = TRUE)
+```
+
+---
+
+# Détecter et traiter les valeurs aberrantes (Outliers)
+
+## Qu'est-ce qu'un outlier ?
+
+Un **outlier** est une observation qui s'écarte fortement des autres valeurs d'une distribution. Il peut résulter d'une erreur de saisie, d'un cas extrême réel, ou d'un phénomène atypique.
+
+Les outliers **faussent la moyenne**, **gonflent la variance** et perturbent les modèles sensibles à la magnitude des valeurs.
+
+## Méthode 1 : Z-Score
+
+Le Z-Score mesure l'écart d'une valeur par rapport à la moyenne en unités d'écart-type. Toute valeur avec |Z| > 3 est considérée comme un outlier.
+
+```python
+# Python
+from scipy import stats
+z_scores = stats.zscore(data)
+outliers  = (z_scores > 3) | (z_scores < -3)
+cleaned_data = data[~outliers]
+```
+
+```{r zscore-r}
+# R
+z_scores <- scale(df$variable)
+df_clean <- df[abs(z_scores) <= 3, ]
+```
+
+## Méthode 2 : IQR (Interquartile Range)
+
+L'IQR est la différence entre le 3ème quartile (Q3) et le 1er quartile (Q1). Toute valeur en dehors de [Q1 − 1.5×IQR ; Q3 + 1.5×IQR] est considérée aberrante. Cette méthode est plus **robuste** que le Z-Score car elle ne dépend pas de la moyenne.
+
+```python
+# Python
+Q1  = data.quantile(0.25)
+Q3  = data.quantile(0.75)
+IQR = Q3 - Q1
+outliers     = (data < (Q1 - 1.5 * IQR)) | (data > (Q3 + 1.5 * IQR))
+cleaned_data = data[~outliers]
+```
+
+```{r iqr-r}
+# R
+Q1  <- quantile(df$variable, 0.25)
+Q3  <- quantile(df$variable, 0.75)
+IQR <- Q3 - Q1
+df_clean <- df %>%
+  filter(variable >= Q1 - 1.5 * IQR,
+         variable <= Q3 + 1.5 * IQR)
+```
+
+## Méthode 3 : Isolation Forest (apprentissage automatique)
+
+Algorithme basé sur des arbres de décision qui **isole les anomalies** en posant des questions sur les attributs. Efficace sur des données multidimensionnelles.
+
+```python
+# Python (scikit-learn)
+from sklearn.ensemble import IsolationForest
+iso_forest   = IsolationForest(contamination=0.05)
+outliers     = iso_forest.fit_predict(data)
+cleaned_data = data[outliers != -1]   # -1 = outlier identifié
+```
+
+## Méthode 4 : Winsorisation
+
+Au lieu de **supprimer** les outliers, on **remplace** les valeurs extrêmes par des percentiles définis (ex. : 5ème et 95ème). La taille du jeu de données est préservée.
+
+```python
+# Python
+from scipy.stats.mstats import winsorize
+cleaned_data = winsorize(data, limits=[0.05, 0.05])
+# 5% des valeurs inférieures et 5% des valeurs supérieures sont remplacées
+```
+
+```{r winsorise-r}
+# R (package DescTools)
+library(DescTools)
+df$variable <- Winsorize(df$variable, probs = c(0.05, 0.95))
+```
+
+## Méthode 5 : Transformations mathématiques
+
+Ces transformations réduisent l'influence des grandes valeurs en **compressant l'échelle** :
+
+| Transformation      | Formule         | Cas d'usage                                      |
+|---------------------|-----------------|--------------------------------------------------|
+| Logarithmique       | y = log(x)      | Valeurs strictement positives, forte asymétrie   |
+| Racine carrée       | y = √x          | Valeurs ≥ 0, asymétrie modérée                  |
+| Box-Cox             | Paramètre λ ajustable | Distribution non normale, variance instable |
+
+```python
+# Python
+import numpy as np
+df['log_var']  = np.log(df['variable'])
+df['sqrt_var'] = np.sqrt(df['variable'])
+
+from scipy.stats import boxcox
+df['boxcox_var'], _ = boxcox(df['variable'])
+```
+
+```{r transformations-r}
+# R
+df$log_var   <- log(df$variable)
+df$sqrt_var  <- sqrt(df$variable)
+
+# Box-Cox (package MASS)
+library(MASS)
+bc <- boxcox(variable ~ 1, data = df)
+lambda <- bc$x[which.max(bc$y)]
+df$boxcox_var <- (df$variable^lambda - 1) / lambda
+```
+
+## Visualiser les outliers
+
+```{r visualisation-r}
+# Boxplot — détection visuelle
+ggplot(df, aes(y = variable)) +
+  geom_boxplot(fill = "steelblue", outlier.color = "tomato") +
+  labs(title = "Distribution avec outliers", y = "Variable")
+
+# Histogramme avec courbe normale
+ggplot(df, aes(x = variable)) +
+  geom_histogram(aes(y = ..density..), bins = 30, fill = "steelblue", alpha = 0.7) +
+  stat_function(fun = dnorm,
+                args = list(mean = mean(df$variable),
+                            sd   = sd(df$variable)),
+                color = "tomato", size = 1) +
+  labs(title = "Distribution et courbe normale")
+```
+
+---
+
+# Mise à l'échelle des variables (Feature Scaling)
+
+Beaucoup d'algorithmes sont sensibles à l'**ordre de grandeur** des variables. Par exemple, si une variable `âge` varie de 0 à 100 et une variable `revenu` varie de 0 à 100 000, le revenu dominera artificiellement les calculs.
+
+> ⚠️ **Ne jamais appliquer la mise à l'échelle à la variable dépendante (Y).**
+
+## Standardisation (Standard Scaler)
+
+Centre les données autour de 0 avec un écart-type de 1. Recommandée pour la **régression linéaire, logistique, SVM, PCA, K-Means**.
+
+$$z = \frac{x - \mu}{\sigma}$$
+
+```python
+# Python
+from sklearn.preprocessing import StandardScaler
+scaler   = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)   # Apprend + transforme
+X_test_scaled  = scaler.transform(X_test)         # Transforme seulement
+```
+
+```{r standard-scaler-r}
+# R
+df_scaled <- as.data.frame(scale(df[, variables_numeriques]))
+```
+
+> 💡 `fit_transform` sur les données d'entraînement, `transform` uniquement sur les données de test — **jamais** `fit` sur le test.
+
+## Normalisation Min-Max
+
+Ramène toutes les valeurs dans l'intervalle [0, 1]. Adaptée quand la distribution n'est **pas normale**.
+
+$$x_{norm} = \frac{x - x_{min}}{x_{max} - x_{min}}$$
+
+```python
+# Python
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(X)
+```
+
+```{r minmax-r}
+# R
+min_max_scale <- function(x) (x - min(x)) / (max(x) - min(x))
+df_scaled <- df %>% mutate(across(where(is.numeric), min_max_scale))
+```
+
+## Normalizer (norme unitaire)
+
+Chaque **ligne** est mise à l'échelle pour avoir une norme de 1. Utilisé en NLP (TF-IDF) et pour les mesures de similarité cosinus.
+
+```python
+# Python
+from sklearn.preprocessing import Normalizer
+normalizer = Normalizer()
+X_normalized = normalizer.fit_transform(X)
+```
+
+---
+
+# Équilibrage des classes
+
+Un jeu de données est **déséquilibré** si une classe est bien plus représentée que les autres (ex. : 95 % sains / 5 % malades). Les modèles tendent alors à ignorer la minorité.
+
+**Règle pratique :** si `2 × effectif_minoritaire < effectif_majoritaire`, le déséquilibre est problématique.
+
+## Suréchantillonnage aléatoire (RandomOverSampler)
+
+Duplique aléatoirement des observations de la classe minoritaire. Simple mais peut créer du **surapprentissage**.
+
+```python
+# Python
+from imblearn.over_sampling import RandomOverSampler
+ros = RandomOverSampler()
+X_resampled, y_resampled = ros.fit_resample(X, y)
+```
+
+## SMOTE — Synthetic Minority Oversampling Technique
+
+Génère de **nouvelles observations synthétiques** en interpolant entre des exemples existants de la classe minoritaire. Plus robuste que la duplication simple.
+
+```python
+# Python
+from imblearn.over_sampling import SMOTE
+smote = SMOTE()
+X_resampled, y_resampled = smote.fit_resample(X, y)
+```
+
+```{r smote-r}
+# R (package themis, intégré dans tidymodels)
+library(themis)
+# Dans un workflow tidymodels :
+# recipe %>% step_smote(variable_cible)
+```
+
+---
+
+# Les 3 erreurs classiques à éviter
+
+## Erreur 1 : Ignorer les valeurs manquantes
+
+Supprimer toutes les lignes avec NA fait perdre des données précieuses. Imputer sans réfléchir introduit des biais. **Analysez d'abord le mécanisme de la valeur manquante** (aléatoire ? systématique ?) avant de choisir la stratégie.
+
+## Erreur 2 : Négliger les doublons
+
+Les doublons sont souvent invisibles à l'œil nu. Toujours vérifier avec `duplicated()` / `drop_duplicates()` **avant** toute analyse.
+
+## Erreur 3 : Ne pas standardiser les formats
+
+Des incohérences dans les dates, les unités ou les catégories textuelles causent des erreurs silencieuses. Standardiser dès l'import : majuscules/minuscules, formats de date, unités de mesure.
+
+```python
+# Python : standardiser les formats
+df['date']   = pd.to_datetime(df['date'])
+df['texte']  = df['texte'].str.lower().str.strip()
+```
+
+```{r formats-r}
+# R : standardiser les formats
+df$date  <- as.Date(df$date, format = "%Y-%m-%d")
+df$texte <- tolower(trimws(df$texte))
+```
+
+---
+
+# Résumé des fonctions clés
+
+| Étape                    | Python (pandas/sklearn)              | R                                      |
+|--------------------------|--------------------------------------|----------------------------------------|
+| Détecter les doublons    | `df.duplicated().sum()`              | `sum(duplicated(df))`                  |
+| Supprimer les doublons   | `df.drop_duplicates()`               | `df %>% distinct()`                    |
+| Détecter les NA          | `df.isnull().sum()`                  | `colSums(is.na(df))`                   |
+| Supprimer les NA         | `df.dropna()`                        | `na.omit(df)`                          |
+| Imputer par médiane      | `df.fillna(df.median())`             | `mutate(x = replace_na(x, median(x)))` |
+| Outliers (IQR)           | `Q1/Q3 + IQR * 1.5`                 | `quantile()` + `filter()`              |
+| Outliers (Z-Score)       | `stats.zscore()`                     | `scale()`                              |
+| Winsorisation            | `winsorize(limits=[0.05, 0.05])`     | `DescTools::Winsorize()`               |
+| Standardisation          | `StandardScaler().fit_transform()`   | `scale()`                              |
+| Normalisation Min-Max    | `MinMaxScaler().fit_transform()`     | Fonction personnalisée                 |
+| Encodage label           | `cat.codes`                          | `as.numeric(factor())`                 |
+| Encodage one-hot         | `pd.get_dummies()`                   | `model.matrix()` / `fastDummies`       |
+
+---
+
+> 📌 **Règle d'or :** Le prétraitement n'est pas une étape unique — c'est un **processus itératif**. Explorez, nettoyez, vérifiez, recommencez. La qualité de votre analyse finale dépend entièrement de la qualité des données que vous lui fournissez.

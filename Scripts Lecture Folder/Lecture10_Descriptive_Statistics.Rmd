@@ -1,0 +1,860 @@
+---
+title: "Descriptive Statistics in R"
+subtitle: "A Comprehensive Lecture — From Central Tendency to Probability Distributions"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  comment = "##",
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width = 7,
+  fig.height = 4.5
+)
+```
+
+```{r packages}
+library(tidyverse)
+```
+
+---
+
+# Introduction
+
+**Descriptive statistics** summarizes and describes the main features of a dataset. Rather than drawing conclusions about a broader population (that is inferential statistics), descriptive statistics simply tells us *what is in our data*: how values are distributed, where they cluster, and how spread out they are.
+
+In this lecture we cover:
+
+- **Types of variables** — quantitative vs categorical, discrete vs continuous
+- **Exploring a dataset** — `str()`, `summary()`, `dim()`, `head()`
+- **Measures of central tendency** — mean, median, mode
+- **Measures of dispersion** — range, variance, standard deviation, IQR
+- **Measures of position** — quartiles, percentiles, confidence intervals
+- **Frequency tables** — `table()`, `prop.table()`, `addmargins()`
+- **Cross-tabulation** — two-way and three-way tables
+- **Grouped statistics** — `tapply()`, `aggregate()`, `dplyr`
+- **Handling missing values** — `na.rm`, `is.na()`, `na.omit()`
+- **Visual summaries** — histograms, boxplots, density plots
+- **Advanced packages** — `psych::describe()`, `Hmisc::describe()`
+- **Probability distributions** — normal, binomial, Poisson, uniform
+
+---
+
+# Types of Variables
+
+Understanding what type of variable you are working with determines which statistical tools are appropriate.
+
+| Type | Sub-type | Examples | R class |
+|---|---|---|---|
+| **Quantitative** | Continuous | Age, weight, temperature | `numeric` |
+| **Quantitative** | Discrete | Number of children, count of cases | `integer` |
+| **Categorical** | Nominal | Sex, blood type, cancer type | `factor` |
+| **Categorical** | Ordinal | Education level, pain scale, severity | `ordered factor` |
+
+```{r variable-types}
+# Quantitative continuous
+age   <- c(45, 50, 55, 40, 60, 70, 45, 50, 65, 55)
+class(age)
+
+# Categorical nominal — must convert to factor for statistics
+sex   <- c("Male", "Female", "Male", "Female", "Male")
+sex_f <- factor(sex)
+class(sex_f)
+levels(sex_f)
+
+# Categorical ordinal — ordered factor
+severity <- factor(c("Low", "High", "Medium", "Low", "High"),
+                   levels  = c("Low", "Medium", "High"),
+                   ordered = TRUE)
+severity
+severity[1] < severity[3]   # TRUE — ordering works
+```
+
+> ⚠️ Always convert character columns to `factor` before doing statistical summaries. R cannot produce meaningful frequency counts or group comparisons on raw character columns.
+
+---
+
+# Building and Exploring a Dataset
+
+## Creating a Dataset for This Lecture
+
+```{r create-data}
+set.seed(7)
+
+s      <- c("Female", "Male")
+sexe   <- sample(s, 423, replace = TRUE)
+a      <- c(15:20)
+age    <- sample(a, 423, replace = TRUE)
+cl     <- c("A", "B", "C")
+classe <- sample(cl, 423, replace = TRUE)
+
+anglais  <- round(rnorm(423, 7, 0.5) + ifelse(sexe == "Female", 2, 0), 0)
+info     <- round(rnorm(423, 5, 3)   + ifelse(age >= 19, 2, 0), 0)
+art      <- round(rnorm(423, 4, 3)   + ifelse(classe == "C", 2, -1), 0)
+histoire <- round(rnorm(423, 6, 2)   + ifelse(classe == "B" & sexe == "Male", 2, 0), 0)
+
+ecole <- data.frame(age, sexe, classe, anglais, info, art, histoire)
+rm(age, classe, sexe, anglais, info, art, histoire, a, cl, s)
+
+# Clip scores to [0, 10]
+for (v in c("anglais", "info", "art", "histoire")) {
+  ecole[[v]] <- pmin(pmax(ecole[[v]], 0), 10)
+}
+
+# Convert categorical variables to factors
+ecole$sexe   <- as.factor(ecole$sexe)
+ecole$classe <- as.factor(ecole$classe)
+
+head(ecole)
+```
+
+## First-Inspection Functions
+
+```{r first-inspection}
+dim(ecole)         # Rows × Columns
+nrow(ecole)        # Number of observations
+ncol(ecole)        # Number of variables
+names(ecole)       # Variable names
+str(ecole)         # Structure: type + preview of each column
+```
+
+## `summary()` — The Swiss-Army Knife
+
+`summary()` gives six key statistics for quantitative variables, and frequency counts for factors:
+
+```{r summary}
+summary(ecole)
+```
+
+For **quantitative** columns: Min, Q1, Median, Mean, Q3, Max.  
+For **factor** columns: count of each level.  
+For **columns with NAs**: the number of missing values is also shown.
+
+> 💡 `summary()` is always the first function to call on a new dataset.
+
+---
+
+# Measures of Central Tendency
+
+Central tendency tells us *where the data is centered* — the typical or representative value.
+
+## Mean — `mean()`
+
+The arithmetic mean is the sum of all values divided by the count. It is sensitive to **outliers**.
+
+$$\bar{x} = \frac{\sum x_i}{n}$$
+
+```{r mean}
+age_patients <- c(45, 50, 55, 40, 60, 70, 45, 50, 65, 55)
+mean(age_patients)
+
+# With mtcars
+mean(mtcars$mpg)
+
+# Missing values: without na.rm the result is NA
+x <- c(3, 5, NA, 8, NA, 2)
+mean(x)                  # NA
+mean(x, na.rm = TRUE)    # Correct: ignores NAs
+```
+
+## Median — `median()`
+
+The middle value when data is sorted. It is **robust to outliers** — a better measure of center for skewed data.
+
+```{r median}
+blood_pressure <- c(130, 140, 120, 135, 150, 125, 145, 155, 140, 130)
+median(blood_pressure)
+
+median(mtcars$mpg)
+
+# Compare mean vs median on skewed data
+income <- c(30, 32, 35, 38, 40, 42, 50, 200)   # outlier: 200k
+mean(income)     # pulled up by the outlier
+median(income)   # robust — closer to the typical value
+```
+
+> 💡 **When to use which?** For symmetric distributions, mean and median are close. For skewed data (income, property prices, hospital stay lengths), prefer the **median**.
+
+## Mode
+
+R has no built-in `mode()` function for statistical mode. Write a simple custom function:
+
+```{r mode}
+get_mode <- function(v) {
+  uniq_vals <- unique(v)
+  uniq_vals[which.max(tabulate(match(v, uniq_vals)))]
+}
+
+cancer_types <- c("Lung", "Breast", "Breast", "Lung", "Lung", "Prostate", "Breast")
+get_mode(cancer_types)   # "Lung" — appears most frequently
+
+# Mode is especially useful for categorical variables
+get_mode(ecole$classe)
+```
+
+## Mean, Median, Mode — Summary
+
+| Measure | Function | Sensitive to outliers? | Best for |
+|---|---|---|---|
+| Mean | `mean()` | Yes | Symmetric distributions |
+| Median | `median()` | No | Skewed data, ordinal data |
+| Mode | custom `get_mode()` | No | Categorical data, nominal |
+
+---
+
+# Measures of Dispersion
+
+Dispersion tells us *how spread out* the values are around the center.
+
+## Range — `range()` and `diff()`
+
+The range spans from the minimum to the maximum value:
+
+```{r range}
+weights <- c(60, 70, 65, 80, 72, 55, 78, 90)
+
+min(weights)
+max(weights)
+range(weights)              # Returns both min and max
+
+diff(range(weights))        # Actual range width = max - min = 35
+
+# Find the row (observation) with max/min
+which.max(mtcars$hp)
+which.min(mtcars$hp)
+
+# Get the car name
+rownames(mtcars)[which.max(mtcars$hp)]   # "Maserati Bora"
+rownames(mtcars)[which.min(mtcars$hp)]   # "Honda Civic"
+```
+
+## Variance — `var()`
+
+The variance measures the average squared deviation from the mean. Larger variance = more spread:
+
+$$s^2 = \frac{\sum (x_i - \bar{x})^2}{n - 1}$$
+
+```{r variance}
+cholesterol <- c(210, 230, 220, 240, 260, 250)
+var(cholesterol)
+
+var(mtcars$mpg)
+var(ecole$anglais)
+```
+
+## Standard Deviation — `sd()`
+
+The square root of the variance, in the same units as the original data. Much more interpretable than variance:
+
+$$s = \sqrt{s^2}$$
+
+```{r sd}
+sd(cholesterol)   # ~18.7 mg/dL — typical deviation from the mean
+sd(mtcars$mpg)
+sd(ecole$histoire, na.rm = TRUE)
+```
+
+> 💡 In a **normal distribution**, approximately 68% of values fall within ±1 SD of the mean, 95% within ±2 SD, and 99.7% within ±3 SD. This is the **68-95-99.7 rule**.
+
+## Coefficient of Variation
+
+Useful to compare variability between variables with different units or scales:
+
+```{r cv}
+cv <- function(x, na.rm = TRUE) sd(x, na.rm = na.rm) / mean(x, na.rm = na.rm) * 100
+
+cv(mtcars$mpg)    # % relative variability in mpg
+cv(mtcars$hp)     # % relative variability in hp
+```
+
+---
+
+# Measures of Position
+
+## Quartiles and Percentiles — `quantile()`
+
+Percentiles divide the dataset into 100 equal parts. The key percentiles are the **quartiles**:
+
+- **Q1 (25th percentile):** 25% of values fall below
+- **Q2 (50th percentile):** the median
+- **Q3 (75th percentile):** 75% of values fall below
+
+```{r quantiles}
+blood_sugar <- c(100, 120, 110, 125, 130, 140, 135, 150, 145, 155)
+
+quantile(blood_sugar)                        # Default: 0%, 25%, 50%, 75%, 100%
+quantile(blood_sugar, probs = 0.25)          # Just Q1
+quantile(blood_sugar, probs = c(0.1, 0.9))  # 10th and 90th percentile
+
+# For crime rates
+quantile(mtcars$mpg, probs = 0.025)   # 2.5th percentile
+quantile(mtcars$mpg, probs = 0.975)   # 97.5th percentile
+```
+
+## Interquartile Range (IQR) — `IQR()`
+
+The IQR is the range of the middle 50% of the data: **IQR = Q3 − Q1**. It is robust to outliers and used in boxplot construction:
+
+```{r iqr}
+IQR(blood_sugar)
+IQR(mtcars$mpg)
+IQR(ecole$age)
+```
+
+## Confidence Intervals for the Mean
+
+A 95% confidence interval gives a range of plausible values for the true population mean:
+
+$$CI = \bar{x} \pm 1.96 \times \frac{s}{\sqrt{n}}$$
+
+```{r confidence-interval}
+mpg     <- mtcars$mpg
+n       <- length(mpg)
+m       <- mean(mpg)
+s       <- sd(mpg)
+
+upper_ci <- m + 1.96 * s / sqrt(n)
+lower_ci <- m - 1.96 * s / sqrt(n)
+
+cat("Mean:", round(m, 2), "\n")
+cat("95% CI: [", round(lower_ci, 2), ",", round(upper_ci, 2), "]\n")
+
+# Or use t.test() directly:
+t.test(mpg)$conf.int
+```
+
+---
+
+# The `summary()` Function in Depth
+
+`summary()` is the fastest way to get all central tendency and dispersion measures at once:
+
+```{r summary-depth}
+summary(mtcars$mpg)    # On a single variable
+summary(ecole)         # On the whole data frame
+
+# On a factor — equivalent to table()
+summary(ecole$sexe)
+table(ecole$sexe)      # Same result
+```
+
+## Applying Statistics to Subsets
+
+You can compute statistics on filtered subsets using logical indexing:
+
+```{r subset-stats}
+# Mean score of the first 10 students
+mean(ecole$anglais[1:10])
+
+# Mean info score for students who scored above average
+mean(ecole$info[ecole$info > mean(ecole$info)])
+
+# Mean histoire score by sex
+mean(ecole$histoire[ecole$sexe == "Male"])
+mean(ecole$histoire[ecole$sexe == "Female"])
+
+# Mean anglais for class C students aged 17
+subset_data <- ecole$anglais[ecole$classe == "C" & ecole$age == 17]
+mean(subset_data)
+length(subset_data)   # Always check the sample size!
+```
+
+---
+
+# Applying Functions to All Columns: `sapply()`
+
+```{r sapply-stats}
+# Mean of every numeric column
+sapply(ecole[, c("age", "anglais", "info", "art", "histoire")], mean)
+
+# Multiple statistics at once
+sapply(ecole[, c("anglais", "info", "art", "histoire")],
+       function(x) c(mean   = round(mean(x), 2),
+                     sd     = round(sd(x), 2),
+                     median = median(x),
+                     min    = min(x),
+                     max    = max(x)))
+```
+
+---
+
+# Frequency Tables
+
+Frequency tables are the primary tool for summarizing **categorical** variables.
+
+## One-Way Table — `table()`
+
+```{r table-one}
+table(ecole$sexe)
+table(ecole$classe)
+
+# Single categorical column from any vector
+cancer_types <- c("Lung", "Breast", "Breast", "Lung", "Lung", "Prostate", "Breast")
+table(cancer_types)
+```
+
+## `prop.table()` — Relative Frequencies (Proportions)
+
+```{r prop-table}
+t1 <- table(ecole$sexe, ecole$classe)
+
+prop.table(t1)       # Cell proportions (out of grand total)
+prop.table(t1, 1)    # Row proportions  (each row sums to 1)
+prop.table(t1, 2)    # Column proportions (each column sums to 1)
+
+# As percentages — round for readability
+round(100 * prop.table(t1, 1), 1)   # Row %
+round(100 * prop.table(t1, 2), 1)   # Column %
+```
+
+## `addmargins()` — Adding Row and Column Totals
+
+```{r addmargins}
+addmargins(t1)                                    # Raw counts with totals
+addmargins(round(100 * prop.table(t1), 0))        # % with totals
+```
+
+## Handling `NA` in Tables
+
+```{r table-na}
+data_with_na <- c("A", "B", "A", NA, "C", "B", "A", NA)
+
+table(data_with_na)                          # NAs excluded (default)
+table(data_with_na, useNA = "ifany")         # Include NA if present
+table(data_with_na, useNA = "always")        # Always show NA column
+```
+
+## Two-Way Cross-Tabulation
+
+```{r crosstab}
+table(ecole$sexe, ecole$classe)
+
+# Logical conditions in table()
+table(mtcars$mpg > 20, mtcars$cyl > 4)
+```
+
+## Three-Way Table
+
+```{r three-way}
+# ftable() gives a compact flat display for 3+ variables
+ftable(ecole$sexe, ecole$classe, ecole$age)
+```
+
+## `addmargins()` + `prop.table()` Combined
+
+```{r combined-table}
+t1 <- table(ecole$sexe, ecole$classe)
+addmargins(round(100 * prop.table(t1, 1), 1))
+```
+
+---
+
+# Grouped Statistics
+
+## `tapply()` — Apply a Function by Groups
+
+```{r tapply}
+# Mean of a variable broken down by a grouping factor
+tapply(ecole$anglais, ecole$sexe,   mean)
+tapply(ecole$anglais, ecole$classe, mean)
+
+# By two grouping factors simultaneously
+tapply(ecole$histoire,
+       list(ecole$sexe, ecole$classe),
+       mean)
+```
+
+## `aggregate()` — Group Summaries as a Data Frame
+
+```{r aggregate}
+aggregate(mpg ~ cyl, data = mtcars, FUN = mean)
+
+# Multiple statistics
+aggregate(cbind(anglais, info, art) ~ sexe, data = ecole, FUN = mean)
+aggregate(cbind(anglais, info, art) ~ classe + sexe, data = ecole, FUN = mean)
+```
+
+## `dplyr` Approach — `group_by()` + `summarise()`
+
+```{r dplyr-grouped}
+ecole %>%
+  group_by(sexe, classe) %>%
+  summarise(
+    n          = n(),
+    mean_ang   = round(mean(anglais), 2),
+    mean_info  = round(mean(info), 2),
+    mean_hist  = round(mean(histoire), 2),
+    .groups    = "drop"
+  ) %>%
+  arrange(sexe, classe)
+```
+
+---
+
+# Missing Values — Detection and Handling
+
+## Detecting Missing Values
+
+```{r missing-detect}
+# Add some NAs for demonstration
+x <- c(3, 5, NA, 8, NA, 2, 9, NA)
+
+is.na(x)               # Logical vector: TRUE where NA
+sum(is.na(x))          # How many NAs?
+mean(is.na(x)) * 100   # What % are NA?
+
+# For a data frame
+colSums(is.na(ecole))  # NAs per column
+```
+
+## Ignoring NAs in Calculations
+
+```{r na-rm}
+mean(x)                 # NA — cannot compute with missing values
+mean(x, na.rm = TRUE)   # Correct
+median(x, na.rm = TRUE)
+sd(x, na.rm = TRUE)
+quantile(x, na.rm = TRUE)
+```
+
+## Replacing NAs
+
+```{r na-replace}
+# Replace NA with 0
+x_filled <- ifelse(is.na(x), 0, x)
+x_filled
+
+# Replace NA with the mean
+x_imputed <- ifelse(is.na(x), mean(x, na.rm = TRUE), x)
+x_imputed
+```
+
+## Removing Rows with NAs — `na.omit()`
+
+```{r na-omit}
+df_clean <- na.omit(ecole)   # Removes any row containing at least one NA
+nrow(ecole)
+nrow(df_clean)
+```
+
+---
+
+# Visual Summaries
+
+Visualizations are an essential part of descriptive statistics. They reveal patterns, skewness, and outliers that summary numbers alone can miss.
+
+## Histogram — Distribution of One Variable
+
+```{r histogram}
+hist(mtcars$mpg,
+     col  = "steelblue",
+     main = "Distribution of Fuel Economy",
+     xlab = "Miles per Gallon",
+     ylab = "Frequency",
+     breaks = 10)
+```
+
+## Boxplot — Five-Number Summary
+
+```{r boxplot}
+boxplot(mpg ~ cyl, data = mtcars,
+        col  = c("#6baed6", "#fd8d3c", "#74c476"),
+        main = "Fuel Economy by Number of Cylinders",
+        xlab = "Cylinders",
+        ylab = "Miles per Gallon")
+```
+
+## Density Plot with `ggplot2`
+
+```{r density}
+ggplot(ecole, aes(x = anglais, fill = sexe)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "English Score Distribution by Sex",
+       x = "English Score", fill = "Sex") +
+  theme_bw()
+```
+
+## Histogram with Normal Curve Overlay
+
+```{r hist-normal}
+x <- mtcars$mpg
+
+hist(x, probability = TRUE, col = "lightblue",
+     main = "MPG with Normal Curve",
+     xlab = "Miles per Gallon")
+curve(dnorm(x, mean = mean(x), sd = sd(x)),
+      add = TRUE, col = "red", lwd = 2)
+```
+
+## QQ-Plot — Checking Normality
+
+```{r qqplot}
+qqnorm(mtcars$mpg, main = "QQ-Plot: MPG",
+       pch = 19, col = "steelblue")
+qqline(mtcars$mpg, col = "red", lwd = 2)
+```
+
+Points following the red line indicate a normal distribution.
+
+---
+
+# Advanced Descriptive Packages
+
+## `psych::describe()` — Rich Variable Summary
+
+```{r psych-describe}
+library(psych)
+
+psych::describe(mtcars[, c("mpg", "hp", "wt")])
+```
+
+Output includes: n, mean, sd, median, trimmed mean, mad (median absolute deviation), min, max, range, **skewness**, **kurtosis**, and standard error.
+
+## `Hmisc::describe()` — Detailed with Frequencies
+
+```{r hmisc-describe}
+library(Hmisc)
+
+Hmisc::describe(ecole[, c("anglais", "info", "sexe")])
+```
+
+For numeric columns: n, missing, distinct values, mean, and quantiles.  
+For categorical columns: frequency and proportion of each level.
+
+## `psych::describeBy()` — Summary by Group
+
+```{r describe-by}
+psych::describeBy(ecole[, c("anglais", "info", "art")],
+                  group = ecole$sexe)
+```
+
+---
+
+# Ordinal Variables
+
+Ordinal variables have ordered categories. Create them with `ordered = TRUE`:
+
+```{r ordinal}
+ecole$moyenne <- rowMeans(ecole[, c("anglais", "info", "art", "histoire")])
+
+ecole$niveau <- cut(ecole$moyenne,
+                    breaks = c(-Inf, 6, 7, Inf),
+                    labels = c("Average", "Good", "Excellent"))
+
+ecole$niveau <- ordered(ecole$niveau,
+                        levels = c("Average", "Good", "Excellent"))
+
+table(ecole$niveau)
+summary(ecole$niveau)
+
+# Ordering enables meaningful comparisons
+ecole$niveau[1] < ecole$niveau[2]   # Meaningful because ordered
+```
+
+---
+
+# Probability Distributions
+
+R provides four functions for every distribution, following a consistent naming pattern:
+
+| Prefix | Meaning | Example |
+|---|---|---|
+| `d*()` | Density / probability mass at a point | `dnorm(x)` |
+| `p*()` | Cumulative probability P(X ≤ x) | `pnorm(x)` |
+| `q*()` | Quantile: value at given probability | `qnorm(p)` |
+| `r*()` | Random sample from the distribution | `rnorm(n)` |
+
+## Normal Distribution
+
+The most important distribution in statistics — bell-shaped, symmetric.
+
+```{r normal-dist}
+# Generate random data: daily malaria cases (mean=120, sd=30)
+set.seed(123)
+daily_cases <- rnorm(10, mean = 120, sd = 30)
+daily_cases
+
+# Probability density at x = 150
+dnorm(150, mean = 120, sd = 30)
+
+# Cumulative probability: P(X ≤ 150)
+pnorm(150, mean = 120, sd = 30)
+
+# Probability between 100 and 150
+pnorm(150, 120, 30) - pnorm(100, 120, 30)
+
+# 97.5th percentile
+qnorm(0.975, mean = 120, sd = 30)
+
+# Plot the standard normal curve
+x <- seq(-3, 3, length.out = 200)
+plot(x, dnorm(x), type = "l", lwd = 2, col = "steelblue",
+     xlab = "Z-score", ylab = "Density",
+     main = "Standard Normal Distribution")
+abline(v = c(-1.96, 1.96), col = "red", lty = 2)
+```
+
+## Binomial Distribution
+
+Models the number of successes in `n` independent yes/no trials:
+
+```{r binomial-dist}
+# Probability of exactly 20 positive RDT tests out of 100 (p = 0.30)
+dbinom(20, size = 100, prob = 0.30)
+
+# Cumulative: P(X ≤ 20)
+pbinom(20, size = 100, prob = 0.30)
+
+# Generate 10 random counts
+rbinom(10, size = 100, prob = 0.30)
+```
+
+## Poisson Distribution
+
+Models the number of events in a fixed interval when events are rare and independent:
+
+```{r poisson-dist}
+# 20 random daily malaria counts (mean λ = 80)
+rpois(20, lambda = 80)
+
+# P(exactly 75 cases in a day)
+dpois(75, lambda = 80)
+
+# P(≤ 75 cases)
+ppois(75, lambda = 80)
+
+# Value below which 90% of days fall
+qpois(0.90, lambda = 80)
+```
+
+## Uniform Distribution
+
+All values in a range are equally likely:
+
+```{r uniform-dist}
+# Simulate 10 random rainfall values between 0 and 250 mm
+runif(10, min = 0, max = 250)
+
+# Density at x = 100 (constant for uniform)
+dunif(100, min = 0, max = 250)
+
+# P(rainfall < 150 mm)
+punif(150, min = 0, max = 250)
+
+# 90th percentile
+qunif(0.90, min = 0, max = 250)
+```
+
+## Reproducible Random Numbers — `set.seed()`
+
+```{r set-seed}
+set.seed(42)
+rnorm(5)   # Always produces the same 5 values
+
+set.seed(42)
+rnorm(5)   # Identical to above
+```
+
+## `sample()` — Random Sampling
+
+```{r sample-func}
+# 10 random patients from IDs 1 to 1000
+sample(1:1000, size = 10, replace = FALSE)
+
+# Simulate diagnostic outcomes with probabilities
+sample(c("Positive", "Negative"), size = 10,
+       replace = TRUE, prob = c(0.35, 0.65))
+```
+
+---
+
+# Complete Worked Example
+
+```{r complete-example}
+library(tidyverse)
+
+# Full descriptive analysis pipeline on mtcars
+mtcars %>%
+  # 1. Select variables of interest
+  select(mpg, hp, wt, cyl) %>%
+
+  # 2. Overall summary
+  summary() %>%
+  print()
+
+# 3. Summary statistics by group
+mtcars %>%
+  mutate(cyl_f = factor(cyl)) %>%
+  group_by(cyl_f) %>%
+  summarise(
+    n         = n(),
+    mean_mpg  = round(mean(mpg), 1),
+    sd_mpg    = round(sd(mpg), 1),
+    median_hp = median(hp),
+    IQR_wt    = IQR(wt),
+    .groups   = "drop"
+  )
+```
+
+---
+
+# Statistical Summary Functions — Quick Reference
+
+| Task | Function | Package |
+|---|---|---|
+| Mean | `mean(x, na.rm=TRUE)` | base |
+| Median | `median(x, na.rm=TRUE)` | base |
+| Mode | custom `get_mode(x)` | — |
+| Variance | `var(x, na.rm=TRUE)` | base |
+| Std deviation | `sd(x, na.rm=TRUE)` | base |
+| Min / Max | `min(x)` / `max(x)` | base |
+| Range | `range(x)` / `diff(range(x))` | base |
+| Quantiles | `quantile(x, probs=...)` | base |
+| IQR | `IQR(x, na.rm=TRUE)` | base |
+| Full 6-number summary | `summary(x)` | base |
+| Frequency table | `table(x)` | base |
+| Proportions | `prop.table(t)` | base |
+| With margins | `addmargins(t)` | base |
+| By group | `tapply(x, g, FUN)` | base |
+| By group (df) | `aggregate(y ~ g, df, FUN)` | base |
+| Rich summary | `psych::describe(df)` | psych |
+| Detailed summary | `Hmisc::describe(df)` | Hmisc |
+| Summary by group | `psych::describeBy(df, g)` | psych |
+
+---
+
+# Practice Exercises
+
+**Exercise 1.** Using the `airquality` dataset, compute the mean, median, standard deviation, and IQR for `Ozone`, `Solar.R`, `Wind`, and `Temp`. Handle missing values appropriately. Which variable has the highest relative variability (CV)?
+
+**Exercise 2.** Using the `mtcars` dataset, create a frequency table of `cyl`. Then create a cross-tabulation of `cyl` vs `am` (transmission type). Compute row percentages and add margins. Interpret the result.
+
+**Exercise 3.** Using the `ecole` dataset created in this lecture, compute the mean score in `anglais` separately for: (a) each sex, (b) each class, (c) each sex × class combination. Which group has the highest mean?
+
+**Exercise 4.** Generate 1000 random values from a Normal distribution with mean = 70 and sd = 10. Compute the mean, median, sd, and 5th/95th percentiles. What proportion of values fall within ±1 sd of the mean? Plot a histogram with the theoretical normal curve overlaid.
+
+**Exercise 5.** Write a function `full_describe(x, group = NULL)` that prints: mean, median, mode, SD, IQR, min, max, number of NAs, and (if `group` is provided) all of these split by group. Test it on `mtcars$mpg` with `group = mtcars$cyl`.
+
+**Exercise 6.** Using the Poisson distribution with λ = 50, compute: (a) the probability of exactly 45 events, (b) the probability of more than 60 events, (c) the 95th percentile. Then generate 500 Poisson samples and verify that their mean and variance are approximately equal to λ.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — Descriptive Statistics in R*

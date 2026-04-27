@@ -1,0 +1,1273 @@
+---
+title: "Machine Learning in R"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+`I. Introduction to Machine Learning`
+
+Machine learning (ML) can seem complex, but it's simply about teaching computers to learn from data—much like humans learn from experience. In this article, we'll explain machine learning basics, focusing on two main types: **supervised and unsupervised learning**. We'll start with simple analogies and progress to real examples using tabular data. Then we'll explore how machine learning is transforming fields like **genomics, proteomics, drug discovery, and disease prediction**.
+
+# What is Machine learning?
+
+Imagine you're a child learning to tell cats and dogs apart. After seeing several examples, you learn to spot the differences: cats are typically smaller with whiskers and meow, while dogs are larger, bark, and wag their tails.
+
+Machine learning follows this same principle. We give a computer many examples (data) and teach it to find patterns or make predictions.
+
+# Keys Concepts in Machine learning 
+
+## 1. Supervised Learning
+
+Supervised learning is like having a teacher guide you. The computer receives both input (features) and correct output (labels) during training.
+
+- **Features**: The characteristics used to make predictions (e.g., animal size, sound, presence of whiskers).
+
+- **Labels**: The correct answers provided during training (e.g., "cat" or "dog").
+
+**Example**:  Consider a table of animals with features like size, sound, and whiskers, plus labels showing whether each is a cat or dog. This data trains a model to identify new animals.
+
+```{r}
+data <- data.frame(
+  size = c("small", "Large", "small", "Large"), 
+  sound = c("Meow", "Bark", "Meow", "Baark"),
+  whiskers = c("Yes", "No", "Yes", "No"),
+  Label = c("Cat", "Dog", "Cat", "Dog")
+  )
+
+data
+```
+
+
+## Unsuerpevised Learning
+
+Unsupervised learning is like exploring without guidance. The computer receives data without labels and must discover patterns independently.
+ 
+**Example**:  Given animal data without labels, the computer groups similar animals together, potentially creating separate clusters for cats and dogs based on their size, sound, and whiskers.
+
+```{r}
+data1 <- data.frame(
+  size = c("small", "Large", "small", "Large"), 
+  sound = c("Meow", "Bark", "Meow", "Baark"),
+  whiskers = c("Yes", "No", "Yes", "No")
+  )
+
+data1
+```
+
+## Training and Testing
+
+Machine learning typically divides data into two parts:
+
+- **Training Data**: Used to teach the machine.
+
+- **Testing Data**: Used to evaluate the machine's learning.
+
+It's similar to studying for an exam—you learn from practice materials (training) and prove your understanding through the test (testing).
+
+## Moving to Real examples
+
+Let's examine a real-world scenario: a patient dataset containing age, blood pressure, and cholesterol levels to predict heart disease.
+
+```{r}
+data2 <- data.frame(
+  Age = c(45, 50, 60, 55),
+  Blood_Pressure = c(130, 120, 140, 135),
+  cholesterol = c(250, 230, 270, 240),
+  Heart_Disease_Label = c("Yes", "No", "Yes", "No")
+  )
+
+data2
+```
+
+- **Features**: Age, Blood Pressure, Cholesterol
+
+- **Labels**: Whether or not the patient has heart disease
+
+Using these features, we can train a supervised learning model to predict heart disease in new patients (as binary logistic regression).
+
+**Applications of Machine Learning in Biology**
+
+Machine learning is transforming biology in several key ways:
+
+1. `Genomics`
+
+Machine learning analyzes vast DNA sequence datasets to identify disease-linked genetic variations. It can predict the likelihood of specific conditions based on genetic profiles.
+
+2. `Proteomics`
+
+In proteomics, machine learning classifies proteins by their structure and function, helping identify new disease biomarkers.
+
+3. `Drug Discovery`
+
+Machine learning speeds up traditional drug discovery by predicting molecular interactions with body targets, accelerating potential drug identification.
+
+4. `Disease Prediction`
+
+By analyzing patient data, machine learning models can predict diseases before symptoms appear, enabling early intervention for conditions like diabetes or cancer.
+
+**Conclusion**
+
+Machine learning mirrors human learning by extracting patterns from data. Understanding its fundamentals—supervised and unsupervised learning, features, labels, training, and testing—opens doors to solving real biological challenges. From genetic disorder prediction to protein analysis, drug development, and disease forecasting, machine learning provides powerful tools for advancing life sciences.
+
+II. `Regression Vs Classification`:
+
+In machine learning, **regression** and **classification** are two fundamental concepts. These are tasks where machines learn to find patterns in data. This article explains what regression and classification are, how they differ, and their roles in both **supervised and unsupervised learning**. We'll also introduce `scikit-learn`, a popular Python library for implementing these concepts.
+
+# What is Regression?
+
+Regression predicts **continuous** values—like forecasting weather or estimating someone's height based on their age. The output is a number that can be any value within a continuous range.
+
+**Example**:
+
+Imagine you're a farmer predicting crop yield based on rainfall.
+
+```{r}
+Data <- data.frame(
+  Rainfall_inches = c(10, 12, 15, 20),
+  Crop_Yield_tons = c(15, 1.8, 2.3, 2.9)
+)
+
+Data
+```
+
+The goal is to find the relationship between **rainfall (input feature)** and **crop yield (output value)** to predict future yields.
+
+# what is classification:
+
+Classification predicts **discrete** categories. Think of it as sorting items into specific bins based on their characteristics. The output is a label that places data into a defined category.
+
+**Example**:
+
+Consider a doctor predicting whether a patient has a disease based on symptoms.
+
+```{r}
+class1 <- data.frame(
+  Symptom_A = c("Present", "Present", "Absent", "Present"),
+  Symptom_B = c("Present", "Absent", "Present", "Present"),
+  Disease_yes_or_No = c("Yes", "No", "No", "Yes")
+)
+```
+
+Here, patients are classified into two categories: **Yes** (has the disease) or **No** (does not have the disease).
+
+**How Regression and Classification Differ**
+
+
+- **Regression** predicts a **number**—like house prices, stock prices, or a person's weight.
+
+- **Classification** predicts a **category or label**—like identifying spam emails or flower species.
+
+**Why Both Can Be Found Under Supervised Learning**
+
+Both regression and classification are forms of **supervised learning**, meaning they need labeled data. In supervised learning, we feed the algorithm both input data (features) and their corresponding outputs (labels) during training.
+
+- In **regression**, the labels are continuous values (e.g., crop yield, temperature).
+
+- In **classification**, the labels are discrete categories (e.g., cancer/healthy, healthy/sick).
+
+**Can Regression and Classification Be Unsupervised?**
+
+While typically supervised, both approaches can work in **unsupervised learning** contexts.
+
+  - **Unsupervised Regression**: Finds patterns in data without explicit labels, such as clustering based on continuous variables.
+
+  - **Unsupervised Classification**: Known as clustering, groups data into categories without predefined labels.
+
+For instance, in **unsupervised classification**, you might group animals into clusters based on their features (e.g., size, diet) without prior knowledge of their species.
+
+III. `Supervised Regression: Linear Regression`
+
+Linear regression is one of the most important and foundational statistical techniques. Mastering this technique is essential for any data analyst and data scientist because, as you will see, it forms the basis for many more advanced methods.
+
+# What is Linear Regression:
+
+A linear regression is a statistical model that analyzes the relationship between a response variable (often called y) and one or more variables and their interactions (often called x or explanatory variables). You make this kind of relationship in your head all the time, for example, when you calculate the age of a child based on their height, you are assuming the older they are, the taller they will be.
+
+Linear regression is one of the most basic statistical models out there. Its results can be interpreted by almost everyone, and it has been around since the 19th century. This is precisely what makes linear regression so popular. It’s simple, and it has survived for hundreds of years. Even though it is not as sophisticated as other algorithms like **artificial neural networks or random forests**, according to a survey made by KD Nuggets, regression was the algorithm most used by data scientists in **2016 and 2017**. It’s even predicted it will still be used in the year **2118**!
+
+# Linear Regresssion with R
+
+A linear regression can be calculated in R with the command `lm()`. In the next example, we use this command to calculate **estimate height based on the child's age**.
+
+First, import the library `readxl` to read Microsoft Excel files. Our **Introduction to Importing Data in R** course is a great resource if you are unfamiliar with importing Excel or CSV files into an R environment like RStudio.
+
+You can download the data to use for this tutorial before you get started. Download the data to an object called `ageandheight` and then create the linear regression in the third line. The `lm()` function takes the variables in the format: `lm([target] ~ [predictor], data = [data source])`
+
+```{r}
+library(readxl)
+ageandheight <- read_excel("D:/disque dur/HackBio Intership/R training/Data/ageandheight.xls")
+View(ageandheight)
+```
+
+```{r}
+lm(height ~ age, data = ageandheight)
+```
+
+Iv. `Install anad Load Required Packages`
+
+**Tasks Description**
+
+First, install the necessary R packages if you haven't already:
+
+```{r}
+#all the tools are installed and available for use already
+install.packages("caret")
+install.packages("randomForest")
+install.packages("ggplot2")
+```
+
+Now, load the libraries:
+
+```{r}
+library(caret)
+library(randomForest)
+library(ggplot2)
+```
+
+**Why these packages**?
+
+  - **caret**: Handles **model training, cross-validation**, and **performance evaluation**.
+
+  - **randomForest**: Implements **Random Forest Regression** for non-linear modeling.
+
+  - **ggplot2**: Helps visualize **predictions vs. actual values**.
+  
+V. `Import the Dataset`
+
+```{r}
+df_link = 'https://raw.githubusercontent.com/HackBio-Internship/2025_project_collection/refs/heads/main/Python/Dataset/cpg_methylation_age_data.csv'
+
+df = read.csv(df_link)
+head(df)
+```
+
+**Explanation**:
+
+The dataset at the given link appears to contain data on **CpG methylation and age**. CpG methylation refers to the addition of a methyl group to cytosine bases in CpG sites (cytosine followed by guanine) in DNA, a key **epigenetic modification** that can influence gene expression. 
+
+* Likely Contents of the Dataset:
+ 
+1. **CpG Sites**: It might have **beta values (methylation levels)** for different CpG sites across samples.
+2. **Age Data**: The dataset may contain chronological age for each sample, which is often used to study **epigenetic age prediction** (e.g., Horvath’s clock).
+3. **Sample IDs**: A unique identifier for each sample.
+
+* Potential Uses:
+
+- **Epigenetic aging research**: Investigating how DNA methylation changes with age.
+- **Biomarker discovery**: Identifying CpG sites that strongly correlate with aging.
+- **Machine learning applications**: Building models to predict biological age from methylation data.
+
+Would you like to load and explore the dataset in Python?
+
+VI. `Step 3: Split Data into training and Testing Sets`
+
+We will split the data into **80% training and 20% testing**.
+
+**Why do we split the data**?
+
+  - We need to **train the model on one dataset** and **test it on unseen data**.
+
+  - This prevents **overfitting** (when a model memorizes training data but fails on new data).
+
+  - **80% training** and **20% testing** is a common rule.
+  
+```{r}
+set.seed(42) #keeps the result reproducible 
+train_index <- createDataPartition(df$Age, p = 0.8, list = FALSE)
+
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+
+df$Age
+```
+  
+# Explanation
+
+1. `Set.seed(42)`:
+
+- This ensures that the random operations in the code produce the same result every time it is run.
+
+- This is useful for reproducibility.
+
+2. `train_index <- createDataPartition(df$Age, p = 0.8, list = FALSE)`:
+
+- `createDataPartition()` is a function from the caret package in R.
+
+- It is used to split data **while maintaining the distribution** of the target variable `(Age)`.
+
+- `df$Age`: The variable used for stratified sampling.
+
+- `p = 0.8`: 80% of the data is used for training.
+
+- `list = FALSE`: Returns a numeric index instead of a list.
+
+3. `train_data <- df[train_index, ]`
+
+  - This selects 80% of the data as the training set.
+
+4. `test_data <- df[-train_index, ]`
+
+  - The remaining 20% of the data is used as the test set.
+  
+**Purpose**:
+
+This code **splits a dataset** `(df)` **into training (80%) and test (20%)** sets, ensuring that the distribution of `Age` in both sets is similar. This is commonly used in **machine learning models** to evaluate performance.
+
+VII. `Step 4: Train a linear Regression Model`
+
+**Define the Model**
+
+We train a **Linear Regression Model** using the `train()` function from `caret`.
+
+**What is Linear Regression**?
+
+  - **Assumes a straight-line relationship** between methylation and age.
+
+  - Good for **interpretable** models but may fail for **non-linear** relationships.
+  
+**Train the model**
+
+We use **5-fold cross-validation** to prevent **overfitting**.
+
+```{r}
+# Train the model
+lm_model <- train(Age ~ ., data = train_data,
+                  method = "lm",
+                  trControl = trainControl(method = "cv", number = 5))  # 5-fold cross-validation
+
+# Print model summary
+summary(lm_model$finalModel)
+```
+
+**Explantion**:
+
+1. `lm_model <- train(Age ~ ., data = train_data, method = "lm", trControl = trainControl(method = "cv", number = 5))`
+
+- `train()`: A function from the caret package used for training machine learning models.
+
+- `Age ~.`
+
+  * `Age` is the target variable (dependent variable).
+
+  * `.` means that all other columns in `train_data` are considered as predictor variables (independent variables).
+
+- `data = train_data`: Uses the training dataset for model training.
+
+- `method = "lm"`: Specifies a linear regression model (`lm` stands for linear model).
+
+- `trControl = trainControl(method = "cv", number = 5)`:
+
+  * `trainControl()` sets how the model is validated.
+
+  * `method = "cv"` means **cross-validation** will be used.
+
+  * `number = 5` indicates **5-fold cross-validation**, where the dataset is split into 5 subsets, and the model is trained on 4 while being validated on the remaining one (this repeats 5 times).
+  
+2. `summary(lm_model$finalModel)`
+
+- Retrieves the final trained linear regression model from `lm_model`.
+
+- `summary()` provides details such as:
+
+  * Coefficients of predictors
+
+  * Significance levels (p-values)
+
+  * R-squared value (goodness of fit)
+
+  * Residual standard error
+  
+**Purpose**:
+
+This code **trains a linear regression model** to predict `Age` based on other variables in `train_data`, using **5-fold cross-validation** to ensure better generalization. Then, it prints the summary of the final trained model.
+
+
+When you run `summary(lm_model$finalModel)`, you'll get output similar to this (though your actual values will differ):
+
+```
+Call:
+lm(formula = Age ~ ., data = train_data)
+
+Residuals:
+   Min     1Q Median     3Q    Max 
+-3.521 -1.245  0.102  1.142  4.987 
+
+Coefficients:
+              Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    4.2536     1.1258   3.779  0.0003 ***
+CpG1           0.6872     0.1543   4.455  0.00001 ***
+CpG2          -0.2341     0.0981  -2.387  0.0193 *  
+CpG3           1.0124     0.2104   4.813  0.000007 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 2.013 on 95 degrees of freedom
+Multiple R-squared:  0.812,	Adjusted R-squared:  0.798 
+F-statistic: 58.23 on 3 and 95 DF,  p-value: < 2.2e-16
+
+```
+
+**Interpretation of key sections**:
+
+1. `Call`: Shows the regression formula used
+
+```{r}
+lm(formula = Age ~ ., data = train_data)
+```
+
+- This means `Age` was predicted using all other available variables.
+
+2. `Residuals`: The distribution of residuals (errors between actual and predicted values):
+
+ ```
+ Min     1Q Median     3Q    Max 
+-3.521 -1.245  0.102  1.142  4.987 
+ 
+ ```
+
+- Ideally, residuals should be **symmetrically distributed around zero**.
+
+-Large residuals (especially in Min/Max) indicate cases where the model performed poorly.
+
+3. `Coefficients Table`:
+
+- This table shows the estimated effect of each predictor on `Age`.
+
+- Columns:
+
+  * **Estimate**: The regression coefficient (β value).
+
+   ** `Intercept = 4.2536`: The predicted age when all predictors are zero.
+
+   ** `CpG1 = 0.6872`: A unit increase in `CpG1` increases `Age` by **0.6872 years**.
+   
+   ** `CpG2 = -0.2341`: A unit increase in `CpG2` decreases `Age` by **0.2341 years**.
+
+- **Std. Error**: Measures how much the coefficient estimate varies.
+
+- **t value**: Tests whether the predictor significantly influences `Age`.
+
+- **Pr(>|t|)**: The **p-value**, indicating statistical significance.
+
+  ** **A small p-value (< 0.05)** means the predictor is likely important.
+
+  ** Here, `CpG1, CpG2, and CpG3` have **significant effects**.
+  
+**4. Model Performance Metrics**
+
+- **Residual standard error: 2.013** → The average prediction error is ~2 years.
+
+- **Multiple R-squared: 0.812** → The model explains **81.2% of the variation in Age**.
+
+- **Adjusted R-squared: 0.798** → Adjusted for the number of 
+predictors; still high (~80%).
+
+- **F-statistic: 58.23, p-value < 2.2e-16** → Strong evidence that at least one predictor is significantly related to Age.
+
+**Conclusion**:
+
+- The model **explains ~80% of the variability** in Age using CpG methylation data.
+
+- Significant CpG sites (low p-values) are likely **good biomarkers** for predicting Age.
+
+- Some residuals indicate the model could be improved, possibly by adding interaction terms or non-linear effects.
+
+
+VIII. `Step 5: Train a Random Forest regression Model`:
+
+**What is Random Forest Regression**?
+
+- Uses **multiple decision trees** to **predict age**.
+
+- Unlike linear regression, it **captures non-linear patterns**.
+
+- It **ranks CpG sites by importance**.
+
+```{r}
+# Train the Random Forest model
+rf_model <- train(Age ~ ., data = train_data,
+                  method = "rf",
+                  trControl = trainControl(method = "cv", number = 5),
+                  tuneLength = 3)  # Limited tuning to speed up
+
+# Print model summary
+print(rf_model)
+```
+**Explanation**:
+
+This code trains a **Random Forest model** using the `caret` package in R.
+
+1. `Training the Model`:
+
+```{r}
+rf_model <- train(Age ~ ., data = train_data,
+                  method = "rf",
+                  trControl = trainControl(method = "cv", number = 5),
+                  tuneLength = 3)
+
+```
+
+- `train()`: Trains a machine learning model using the `caret` package.
+
+- `Age ~ .`: The target variable is `Age`, and all other columns in `train_data` are used as predictors.
+
+- `data = train_data`: The model is trained on the `train_data` dataset.
+
+- `method = "rf"`: Specifies **Random Forest** as the chosen algorithm.
+
+- `trControl = trainControl(method = "cv", number = 5)`:
+
+  * Uses **5-fold cross-validation** to evaluate model performance.
+
+  * The dataset is split into **5 subsets**, where the model is trained on 4 and tested on the remaining one, repeating this process 5 times.
+
+- `tuneLength = 3`:
+
+* controls hyperparameter tuning by testing **3 different values** of the number of randomly selected predictors `(mtry)`.
+
+* This helps optimize the model but is limited to **3 values to reduce computation time**.
+
+2. `Printing Model Summary`:
+
+```{r}
+print(rf_model)
+```
+
+- Displays key model information, including:
+
+  * The best `mtry` (number of predictors randomly selected at each split).
+
+  * Performance metrics such as RMSE (Root Mean Squared Error) and R² (goodness of fit).
+
+  * The number of trees used in the forest (default is 500 in Random Forest).
+  
+**Why Use Random Forest**?
+
+- **Handles non-linearity** → Works well for complex relationships.
+
+- **Reduces overfitting** → Uses multiple decision trees (ensemble learning).
+
+- **Feature importance** → Identifies which predictors contribute most to Age prediction.
+
+IX. `Step: Model Evaluation on Test Data`:
+
+We now **predict age** on the test set and compute performance metrics.
+
+**How do we measure model performance?**
+
+We use **Root Mean Squared Error (RMSE)**: Lower **RMSE** means **better** performance.
+
+```{r}
+# Predict using Linear Regression
+lm_predictions <- predict(lm_model, newdata = test_data)
+
+# Predict using Random Forest
+rf_predictions <- predict(rf_model, newdata = test_data)
+
+# Compute RMSE (Root Mean Squared Error)
+lm_rmse <- RMSE(lm_predictions, test_data$Age)
+rf_rmse <- RMSE(rf_predictions, test_data$Age)
+
+# Print RMSE
+print(paste("Linear Regression RMSE:", round(lm_rmse, 2)))
+print(paste("Random Forest RMSE:", round(rf_rmse, 2)))
+```
+**Explanation**
+
+This code evaluates the performance of **Linear Regression** and **Random Forest** models using **Root Mean Squared Error (RMSE)** on the test dataset.
+
+1. `Making Predcitions`:
+
+```{r}
+lm_predictions <- predict(lm_model, newdata = test_data)
+rf_predictions <- predict(rf_model, newdata = test_data)
+```
+
+- `predict()` is used to generate predictions from the trained models.
+
+- `newdata = test_data`: The model predicts `Age` for the unseen test dataset.
+
+- `lm_predictions` → Predicted values from the **Linear Regression** model.
+
+- `rf_predictions` → Predicted values from the **Random Forest** model
+
+2. `Computing RMS (Root Mean Squared Error)`:
+
+```{r}
+lm_rmse <- RMSE(lm_predictions, test_data$Age)
+rf_rmse <- RMSE(rf_predictions, test_data$Age)
+```
+
+- `RMSE(predictions, actual_values)` calculates the **Root Mean Squared Error**:
+
+  * Measures how far predictions deviate from actual values.
+  * Lower RMSE = better model performance.
+
+- `lm_rmse` → RMSE for **Linear Regression**.
+
+- `rf_rmse` → RMSE for **Random Forest**.
+
+3. `Printing RMSE Values`:
+
+```{r}
+print(paste("Linear Regression RMSE:", round(lm_rmse, 2)))
+print(paste("Random Forest RMSE:", round(rf_rmse, 2)))
+```
+
+Displays RMSE values for both models, rounded to **2 decimal places**.
+
+**Interpreting Results**
+
+- **Lower RMSE = More accurate model**.
+
+- If `rf_rmse` is **lower** than `lm_rmse`, Random Forest is performing **better** than Linear Regression (which is likely due to its ability to handle complex relationships).
+
+- If `lm_rmse` is close to `rf_rmse`, then a simple **linear model** might be sufficient.
+
+X. `Step 7: Feature Importance Analysis`:
+
+**Why is feature importance useful?**
+
+- It tells us **which CpG sites contribute most** to age prediction.
+
+- Random Forest provides a **ranking of feature importance**.
+
+```{r}
+# Extract feature importance from Random Forest
+rf_importance <- varImp(rf_model)
+
+# Plot top 20 important CpG sites
+plot(rf_importance, top = 20)
+```
+
+**Explanation**
+
+This code extracts and visualizes **feature importance** from the trained **Random Forest** model to identify the most influential CpG sites for predicting **Age**.
+
+1. `Extract Feature Importance`:
+
+```{r}
+rf_importance <- varImp(rf_model)
+```
+
+- `varImp()` extracts the importance of each predictor (CpG site) in the **Random Forest** model.
+
+- The importance score represents how much each variable contributes to making predictions.
+
+- Higher scores indicate **more influential CpG sites**.
+
+2. `Plot Top 20 Most Important Features`:
+
+```{r}
+plot(rf_importance, top = 20)
+```
+
+- This **visualizes** the 20 most important CpG sites.
+
+- The plot is typically a **bar chart**, with CpG sites on the y-axis and importance scores on the x-axis.
+
+- **Higher bars** = More important CpG sites in predicting Age.
+
+**Why is Feature Importance Useful**?
+
+- Helps identify key CpG sites linked to aging.
+- Reduces model complexity by removing less important features.
+- Provides biological insights into epigenetic changes with age.
+
+XI. `Step8: Visualizing Predictions Vs. True Age`
+
+We create a scatter plot to compare **predicted vs. actual age**.
+
+**Why visualize predictions**?
+
+- Helps **compare model predictions to actual values**.
+
+- We want points **close to the diagonal line** (perfect prediction).
+
+```{r}
+# Combine results for visualization
+results <- data.frame(Actual_Age = test_data$Age,
+                      Predicted_LM = lm_predictions,
+                      Predicted_RF = rf_predictions)
+
+# Plot
+
+  ggplot(results, aes(x = Actual_Age)) +
+  geom_point(aes(y = Predicted_LM, color = "Linear Regression")) +
+  geom_point(aes(y = Predicted_RF, color = "Random Forest")) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Predicted vs. Actual Age",
+       x = "Actual Age",
+       y = "Predicted Age") +
+  theme_minimal()
+
+# ggsave("picture.png")
+```
+
+
+**Explanation**
+
+This code **visualizes the performance** of Linear Regression and Random Forest models by plotting **predicted vs. actual Age**.
+
+1. `Create A Dataframe For visualization`:
+
+```{r}
+results <- data.frame(Actual_Age = test_data$Age,
+                      Predicted_LM = lm_predictions,
+                      Predicted_RF = rf_predictions)
+
+```
+
+
+- Creates a **data frame** `(results)` with:
+
+* `Actual_Age` → The true age values from the test dataset.
+
+* `Predicted_LM` → Age predictions from the **Linear Regression model**.
+
+* `Predicted_RF` → Age predictions from the **Random Forest** model.
+
+2.`Generate a Scatter Plot`:
+
+```{r}
+ggplot(results, aes(x = Actual_Age)) +
+  geom_point(aes(y = Predicted_LM, color = "Linear Regression")) +
+  geom_point(aes(y = Predicted_RF, color = "Random Forest")) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Predicted vs. Actual Age",
+       x = "Actual Age",
+       y = "Predicted Age") +
+  theme_minimal()
+
+```
+
+**What Each Part Does**:
+
+- `ggplot(results, aes(x = Actual_Age))` → Uses `Actual_Age` as the x-axis.
+
+- `geom_point(aes(y = Predicted_LM, color = "Linear Regression"))` → Plots **blue points** for Linear Regression predictions.
+
+- `geom_point(aes(y = Predicted_RF, color = "Random Forest"))` → Plots **red points** for Random Forest predictions.
+
+- `geom_abline(slope = 1, intercept = 0, linetype = "dashed")` → Adds a **dashed diagonal line** `(y = x)` to represent perfect predictions.
+
+- `labs(...)` → Sets title and axis labels.
+
+- `theme_minimal()` → Applies a clean, minimalistic theme.
+
+3. `How To interpret the Plot`:
+
+- **Closer to the diagonal (dashed line)** → Better predictions.
+
+- **Linear Regression (blue) vs. Random Forest (red)** → You can visually compare accuracy.
+
+- **More scatter = higher prediction error**.
+
+XII. `Random Forest, Feataure selection using Recursive feature Elimination (RFE)`:
+
+**Why Feature Selection**?
+
+- **Too many features** can lead to **overfitting** and slow down the model.
+
+- **Recursive Feature Elimination (RFE)** ranks features based on **importance** and removes the least important ones.
+
+- We use **Random Forest** to identify the **most relevant CpG sites**.
+
+```{r}
+# Define control using cross-validation
+control <- rfeControl(functions = rfFuncs, method = "cv", number = 5)
+
+# Run Recursive Feature Elimination (RFE)
+rfe_result <- rfe(x = df[, -ncol(df)], y = df$Age, sizes = c(10, 20, 50, 100), rfeControl = control)
+
+# Print the selected features
+print(rfe_result)
+```
+
+**Explanation**
+
+1. `Defining rfecontrol`
+
+```{r}
+control <- rfeControl(functions = rfFuncs, method = "cv", number = 5)
+```
+
+- `rfeControl`: This function sets up the control parameters for the RFE (Recursive Feature Elimination) process. It defines how the RFE should be conducted.
+
+  * `functions = rfFuncs`: This indicates that you want to use random forest as the method for feature selection. `rfFuncs` is a pre-defined set of functions that use random forest models for feature ranking and selection.
+
+  * `method = "cv"`: Specifies the resampling method to use during the evaluation of the feature subsets. Here, **cross-validation (cv)** is chosen, meaning the data will be split into training and testing sets for each fold, and the model will be evaluated based on those splits.
+
+  * `number = 5`: This parameter defines the number of folds in the cross-validation process. A value of 5 means that the data will be divided into 5 parts (folds), and the model will be trained and tested 5 times, with each fold being used for testing once and the remaining folds for training.
+
+2. `Running Recursive Feature Elimination (RFE)`:
+
+```{r}
+rfe_result <- rfe(x = df[, -ncol(df)], y = df$Age, sizes = c(10, 20, 50, 100), rfeControl = control)
+```
+
+- `rfe`: This is the function that performs **Recursive Feature Elimination (RFE)**, which is a technique to select the most relevant features by recursively removing the least important ones and building models to check performance.
+
+  * `x = df[, -ncol(df)]`: The `x` argument contains the predictor variables (features) in your dataset. The code `df[, -ncol(df)]` selects all the columns of the dataframe df except the last column. This assumes the last column `(df$Age)` is your target variable, and the remaining columns are features.
+
+  * `y = df$Age`: The `y` argument specifies the target variable (the dependent variable). In this case, it's the `Age` column from the `df` dataframe.
+
+  * `sizes = c(10, 20, 50, 100)`: This specifies the number of features to consider for each subset. The RFE process will evaluate subsets of features of sizes 10, 20, 50, and 100. It will rank features and remove the least important ones until the best subset is found for each size.
+
+  * `rfeControl = control`: This passes the control settings that were defined earlier, telling RFE to use cross-validation `(cv)` with 5 folds and random forest `(rfFuncs)` for feature selection.
+  
+3. `Printing the FRE Results`:
+
+```{r}
+print(rfe_result)
+```
+
+- After running RFE, the `rfe_result` object will contain the results, including the selected features and performance metrics for different subset sizes.
+
+- When you print the result using `print(rfe_result)`, it will show:
+
+  * **The optimal number of features**: This is the size of the feature set that gave the best performance.
+
+  * **Selected features**: The specific features chosen as important.
+
+  * **Cross-validation performance metrics**: You will get information about how well each feature subset performed during cross-validation, such as accuracy or RMSE (depending on the task).
+
+**Summary**
+
+In essence, this code is applying Recursive Feature Elimination (RFE) with random forest models and cross-validation to identify the best set of features that are most predictive of `Age`. By testing different subsets of features (10, 20, 50, 100), RFE evaluates their performance and selects the most important ones. The result will help you understand which features in your dataset are most valuable for predicting `Age`.Summary
+In essence, this code is applying Recursive Feature Elimination (RFE) with random forest models and cross-validation to identify the best set of features that are most predictive of Age. By testing different subsets of features (10, 20, 50, 100), RFE evaluates their performance and selects the most important ones. The result will help you understand which features in your dataset are most valuable for predicting `Age`.
+
+**Selecting the Top Features**
+
+- Based on RFE, we select the **top 50 CpG sites**.
+
+```{r}
+top_features <- predictors(rfe_result)
+
+# Keep only selected features
+df_selected <- df %>% 
+  select(all_of(top_features), Age)
+
+# View the first few rows
+head(df_selected)
+```
+
+**Explanation**:
+
+1. `Extracting the Top features`:
+
+```{r}
+top_features <- predictors(rfe_result)
+```
+
+- `predictors(rfe_result)`: This function extracts the names of the features that were selected as the most important by the **RFE process** (Recursive Feature Elimination) from the result object `rfe_result`.
+
+  * The `rfe_result` object contains the outcome of the feature selection process. The `predictors()` function specifically grabs the **selected features** that were deemed most important based on the performance evaluation.
+
+  The `top_features` variable now holds a vector of the names of the features selected by RFE.
+  
+2. `Creating a New Data Frame with only the selected Features`:
+
+```{r}
+df_selected <- df %>% 
+  select(all_of(top_features), Age)
+```
+
+- `df %>% select(all_of(top_features), Age)`: This part uses `dplyr` syntax to create a new dataframe `df_selected` that contains only the selected features and the target variable `Age`.
+
+  * The `%>%` is the pipe operator from the `dplyr` package, which passes the result of one operation to the next.
+
+  * `select(all_of(top_features), Age)`:
+
+    * `select()` is used to subset the columns of the dataframe.
+
+    * `all_of(top_features)` selects all columns whose names are contained in the `top_features` vector (which you extracted earlier from the RFE result). This selects only the most important features.
+    * `Age` is explicitly included as the target variable.
+
+After this line, `df_selected` contains only the columns that correspond to the selected features and the target variable `Age` from the original `df`.
+
+3. `Viewing the first few Rows`:
+
+```{r}
+head(df_selected)
+```
+
+- `head(df_selected)`: This function shows the first few rows of the newly created `df_selected` dataframe, which contains only the selected features and the target variable `Age`.
+
+  * The default behavior of `head()` is to display the first 6 rows, but this can be modified by passing a different number as an argument (e.g., `head(df_selected, 10)` to show the first 10 rows).
+  
+**Summary**
+
+- The code extracts the **top selected features** identified by RFE and creates a new dataframe, `df_selected`, that contains only those features and the target variable `Age`.
+
+- Finally, it displays the first few rows of the selected features and the target to give you an overview of the data that will be used for further analysis or modeling.
+
+XIII. `Step4: Split Data into Training and Testing Sets`:
+
+**Why do we split the data**?
+
+- To ensure we **train** and **test** the model on separate datasets.
+
+- **80% training** and **20% testing** is a common rule.
+
+```{r}
+train_index <- createDataPartition(df_selected$Age, p = 0.8, list = FALSE)
+
+train_data <- df_selected[train_index, ]
+test_data <- df_selected[-train_index, ]
+```
+
+1. `train_index <- createDataPartition(df_selected$Age, p = 0.8, list = FALSE)`:
+
+- `createDataPartition()` is a function from the caret package in R.
+
+- It is used to split data **while maintaining the distribution** of the target variable `(Age)`.
+
+- `df_selected$Age`: The variable used for stratified sampling.
+
+- `p = 0.8`: 80% of the data is used for training.
+
+- `list = FALSE`: Returns a numeric index instead of a list.
+
+3. `train_data <- df_selected[train_index, ]`
+
+  - This selects 80% of the data as the training set.
+
+4. `test_data <- df_selected[-train_index, ]`
+
+  - The remaining 20% of the data is used as the test set.
+  
+**Purpose**:
+
+This code **splits a dataset** `(df_selected)` **into training (80%) and test (20%)** sets, ensuring that the distribution of `Age` in both sets is similar. This is commonly used in **machine learning models** to evaluate performance.
+
+XIV. `Step5: Train a Random Forest Regression Model`:
+
+**What is Random Forest Regression**?
+
+- Uses **multiple decision trees** to **predict age**.
+
+- Handles **non-linear relationships** better than linear regression.
+
+- Provides **feature importance rankings**.
+
+```{r}
+# Train Random Forest model with cross-validation
+rf_model <- train(Age ~ ., data = train_data,
+                  method = "rf",
+                  trControl = trainControl(method = "cv", number = 5),
+                  tuneLength = 3)  # Limited tuning to speed up
+
+# Print model summary
+print(rf_model)
+```
+
+**Explanation**:
+
+This code trains a **Random Forest model** using the `caret` package in R.
+
+1. `Training the Model`:
+
+```{r}
+rf_model <- train(Age ~ ., data = train_data,
+                  method = "rf",
+                  trControl = trainControl(method = "cv", number = 5),
+                  tuneLength = 3)
+
+```
+
+- `train()`: Trains a machine learning model using the `caret` package.
+
+- `Age ~ .`: The target variable is `Age`, and all other columns in `train_data` are used as predictors.
+
+- `data = train_data`: The model is trained on the `train_data` dataset.
+
+- `method = "rf"`: Specifies **Random Forest** as the chosen algorithm.
+
+- `trControl = trainControl(method = "cv", number = 5)`:
+
+  * Uses **5-fold cross-validation** to evaluate model performance.
+
+  * The dataset is split into **5 subsets**, where the model is trained on 4 and tested on the remaining one, repeating this process 5 times.
+
+- `tuneLength = 3`:
+
+* controls hyperparameter tuning by testing **3 different values** of the number of randomly selected predictors `(mtry)`.
+
+* This helps optimize the model but is limited to **3 values to reduce computation time**.
+
+2. `Printing Model Summary`:
+
+```{r}
+print(rf_model)
+```
+
+- Displays key model information, including:
+
+  * The best `mtry` (number of predictors randomly selected at each split).
+
+  * Performance metrics such as RMSE (Root Mean Squared Error) and R² (goodness of fit).
+
+  * The number of trees used in the forest (default is 500 in Random Forest).
+  
+**Why Use Random Forest**?
+
+- **Handles non-linearity** → Works well for complex relationships.
+
+- **Reduces overfitting** → Uses multiple decision trees (ensemble learning).
+
+- **Feature importance** → Identifies which predictors contribute most to Age prediction.
+
+XV. `Step6: Model Evaluation on Test Data`:
+
+**How do we measure model performance?**
+
+We use **Root Mean Squared Error (RMSE)**: Lower **RMSE** means **better** performance.
+
+```{r}
+# Predict using Random Forest
+rf_predictions <- predict(rf_model, newdata = test_data)
+
+# Compute RMSE (Root Mean Squared Error)
+rf_rmse <- RMSE(rf_predictions, test_data$Age)
+
+# Print RMSE
+print(paste("Random Forest RMSE:", round(rf_rmse, 2)))
+```
+
+**Explanation**
+
+This code evaluates the performance of **Linear Regression** and **Random Forest** models using **Root Mean Squared Error (RMSE)** on the test dataset.
+
+1. `Making Predcitions`:
+
+```{r}
+rf_predictions <- predict(rf_model, newdata = test_data)
+```
+
+- `rf_predictions` → Predicted values from the **Random Forest** model
+
+2. `Computing RMS (Root Mean Squared Error)`:
+
+```{r}
+rf_rmse <- RMSE(rf_predictions, test_data$Age)
+```
+
+- `RMSE(predictions, actual_values)` calculates the **Root Mean Squared Error**:
+
+  * Measures how far predictions deviate from actual values.
+  * Lower RMSE = better model performance.
+
+- `rf_rmse` → RMSE for **Random Forest**.
+
+3. `Printing RMSE Values`:
+
+```{r}
+print(paste("Random Forest RMSE:", round(rf_rmse, 2)))
+```
+
+Displays RMSE values for both models, rounded to **2 decimal places**.
+
+**Interpreting Results**
+
+- **Lower RMSE = More accurate model**.
+
+XVI. `Step7: Feature Importance Analysis: Wj=hy is Feature Importance useful`?
+
+- Tells us **which CpG sites contribute most** to predicting age.
+
+- Helps **biologists focus on key regions** in DNA methylation studies.
+
+```{r}
+# Extract feature importance
+rf_importance <- varImp(rf_model)
+
+# Plot top 20 important CpG sites
+plot(rf_importance, top = 20)
+```
+
+**Explanation**
+
+This code extracts and visualizes **feature importance** from the trained **Random Forest** model to identify the most influential CpG sites for predicting **Age**.
+
+1. `Extract Feature Importance`:
+
+```{r}
+rf_importance <- varImp(rf_model)
+```
+
+- `varImp()` extracts the importance of each predictor (CpG site) in the **Random Forest** model.
+
+- The importance score represents how much each variable contributes to making predictions.
+
+- Higher scores indicate **more influential CpG sites**.
+
+2. `Plot Top 20 Most Important Features`:
+
+```{r}
+plot(rf_importance, top = 20)
+```
+
+- This **visualizes** the 20 most important CpG sites.
+
+- The plot is typically a **bar chart**, with CpG sites on the y-axis and importance scores on the x-axis.
+
+- **Higher bars** = More important CpG sites in predicting Age.
+
+**Why is Feature Importance Useful**?
+
+- Helps identify key CpG sites linked to aging.
+- Reduces model complexity by removing less important features.
+- Provides biological insights into epigenetic changes with age.
+
+XVII. `Step 8: Visualizing Predictions Vs. True Age`
+
+**Why visualize predictions**?
+
+- Helps **compare model predictions to actual values**.
+
+- We want points **close to the diagonal line** (perfect prediction).
+
+```{r}
+# Combine results for visualization
+results <- data.frame(Actual_Age = test_data$Age, Predicted_Age = rf_predictions)
+
+# Plot
+ggplot(results, aes(x = Actual_Age, 
+                    y = Predicted_Age)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, 
+              intercept = 0,
+              linetype = "dashed",
+              color = "red") +
+  labs(title = "Predicted vs. Actual Age",
+       x = "Actual Age",
+       y = "Predicted Age") +
+  theme_minimal()
+```
+
+**Explanation**
+
+1. `Combining Results into a Data Frame`:
+
+```{r}
+results <- data.frame(Actual_Age = test_data$Age,
+                      Predicted_Age = rf_predictions)
+```
+
+- `data.frame()`: This creates a data frame in R, which is a structured way to store data in rows and columns.
+
+  * `Actual_Age = test_data$Age`: The `test_data$Age` refers to the actual ages from the test dataset. This is the true value you are trying to predict, and it’s being stored in a new column called `Actual_Age` in the `results` data frame.
+
+  * `Predicted_Age = rf_predictions`: The `rf_predictions` are the predicted age values that were generated by a Random Forest model (or another model). These are stored in a new column called `Predicted_Age` in the `results` data frame.
+
+- The `results` data frame now contains two columns: `Actual_Age` and `Predicted_Age`, which can be used for visual comparison.
+
+2. `Combining the Plot with ggplot2`:
+
+```{r}
+ggplot(results, aes(x = Actual_Age, 
+                    y = Predicted_Age)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, 
+              intercept = 0,
+              linetype = "dashed",
+              color = "red") +
+  labs(title = "Predicted vs. Actual Age",
+       x = "Actual Age",
+       y = "Predicted Age") +
+  theme_minimal()
+```
+
+- `ggplot(results, aes(x = Actual_Age, y = Predicted_Age))`:
+
+  * `ggplot` is the function used to create plots in R, from the `ggplot2` package.
+
+  * `results` is the data frame being passed to `ggplot`.
+
+  * `aes(x = Actual_Age, y = Predicted_Age)` specifies the **aesthetic mappings** for the plot. It tells `ggplot` that the x-axis will represent the actual ages `(Actual_Age)`, and the y-axis will represent the predicted ages `(Predicted_Age)`.
+  
+  3. `Plotting Data Points`:
+  
+```{r}
+geom_point(color = "blue")
+```
+  
+- `geom_point()`: This adds scatter plot points to the graph. Each point represents one prediction, where the x-value corresponds to the actual age, and the y-value corresponds to the predicted age.
+
+- `color = "blue"`: This sets the color of the scatter points to blue.
+
+4. `Adding a reference Line`:
+
+```{r}
+geom_abline(slope = 1, 
+            intercept = 0,
+            linetype = "dashed",
+            color = "red")
+```
+
+- `geom_abline()`: This adds a straight line to the plot. In this case, it adds a reference line to compare the predicted values with the actual values.
+
+  * `slope = 1`: The slope of the line is 1, meaning it has a 45-degree angle, representing a perfect match between predicted and actual values (i.e., where the predicted values equal the actual values).
+
+  * `intercept = 0`: The line passes through the origin (0, 0), which means the intercept is zero.
+
+  * `linetype = "dashed"`: The line is displayed as a dashed line.
+
+  * `color = "red"`: The reference line is red.
+  
+5. `Addings Lables and theme`:
+
+```{r}
+labs(title = "Predicted vs. Actual Age",
+     x = "Actual Age",
+     y = "Predicted Age") +
+  theme_minimal()
+```
+
+- `labs(title = "Predicted vs. Actual Age", x = "Actual Age", y = "Predicted Age")`: This adds labels to the plot.
+
+  * `title`: The plot’s title is "Predicted vs. Actual Age".
+
+  * `x` and `y`: The axis labels are set to "Actual Age" and "Predicted Age", respectively.
+
+- `theme_minimal()`: This applies a minimal theme to the plot, which removes extra grid lines and background elements, making the plot clean and easy to read.
+
+**Summary**
+
+The code creates a **scatter plot** that compares the **actual vs predicted ages**:
+
+- The **blue points** represent individual data points, where the x-axis is the actual age and the y-axis is the predicted age.
+
+- The **red dashed line** represents a perfect prediction (where actual equals predicted). If the points lie close to this line, it indicates that the predictions are accurate.
+
+- The plot is titled **"Predicted vs. Actual Age"**, and the axes are labeled accordingly.
+
+This plot provides a visual way to assess the model's performance by showing how close the predicted values are to the actual ones.
+
+XVIII. `Conclusiosn`:
+
+Tasks Description
+
+**Key Takeaways**:
+
+- **Feature selection (RFE) reduced CpG sites from 200 to 50**, improving model efficiency.
+
+- **Random Forest captured non-linear methylation-age relationships better than Linear Regression**.
+
+- **Feature importance analysis identified the top CpG sites influencing age prediction**.
+
+This tutorial can be **extended** to real **epigenetic datasets** for **biomedical research**.
+

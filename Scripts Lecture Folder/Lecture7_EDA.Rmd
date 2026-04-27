@@ -1,0 +1,690 @@
+---
+title: "Lecture 6: Exploratory Data Analysis — A Complete Walkthrough"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  fig.width  = 8,
+  fig.height = 5
+)
+```
+
+---
+
+# Learning Objectives
+
+By the end of this lecture, you will be able to:
+
+- Define **Exploratory Data Analysis (EDA)** and describe its place in the data science workflow
+- Load data from **remote URLs** and perform initial inspection with `str()`, `glimpse()`, `summary()`
+- Manipulate data with `tidyverse` tools: `arrange()`, `select()`, `filter()`, `group_by()`, `tally()`
+- Create and interpret key EDA plots: **scatter plots, histograms, density plots, violin plots, and residual plots**
+- Compute and test **correlations** (Pearson, Spearman, Kendall)
+- Implement the **Tietjen-Moore test** for outlier detection
+- Work with **normal distribution functions**: `dnorm()`, `pnorm()`, `qnorm()`, `rnorm()`
+- Assess normality with the **Shapiro-Wilk test**
+
+---
+
+# What is Exploratory Data Analysis?
+
+**Exploratory Data Analysis (EDA)** is the critical first step of any data analysis project. The goal is to understand what your data contains *before* fitting models or running formal tests.
+
+> *"EDA is an attitude, a state of flexibility, a willingness to look for those things that we believe are not there, as well as those we believe to be there."*  
+> — John W. Tukey (1977), the father of EDA
+
+## The EDA Mindset
+
+EDA answers four fundamental questions about your dataset:
+
+1. **What does my data look like?** (structure, types, size)
+2. **Is it clean?** (missing values, duplicates, impossible values)
+3. **What is the distribution of each variable?** (histograms, density plots)
+4. **How do variables relate to each other?** (scatter plots, correlations)
+
+## Key ggplot2 Components (Glossary)
+
+Before visualising, understand the grammar of graphics:
+
+| Component | Description |
+|---|---|
+| **Data** | The dataset to visualise |
+| **Layer** | Geometric elements (points, lines, bars) + statistical transformations |
+| **Scales** | Maps data values to visual properties (colour, size, shape) |
+| **Coordinate system** | Describes how coordinates are projected (Cartesian, polar) |
+| **Faceting** | Splits data into sub-panels for multiple groups |
+| **Theme** | Controls non-data elements (font, background, grid lines) |
+
+---
+
+# Required Packages
+
+```{r load-packages}
+library(tidyverse)    # dplyr, ggplot2, tidyr, readr, lubridate, etc.
+library(lubridate)    # Date handling
+library(gridExtra)    # Arranging multiple base-R plots
+library(scales)       # Axis formatting
+```
+
+---
+
+# Part 1: Loading and Inspecting Data
+
+## Loading a Remote CSV File
+
+R can read CSV files directly from a URL without downloading them first:
+
+```{r load-remote, eval=FALSE}
+site <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/colleges/colleges.csv"
+college_Data <- read.csv(site)
+
+# Save a local copy as an RData file
+save(college_Data, file = "college_Data.RData")
+```
+
+```{r load-local, echo=FALSE}
+# For reproducible demonstration, we simulate the data structure
+set.seed(42)
+college_Data <- data.frame(
+  college      = paste("College", sample(LETTERS, 200, replace = TRUE), sample(1:99, 200, replace = TRUE)),
+  state        = sample(c("Louisiana","Texas","Arkansas","Mississippi","California","New York"), 200, replace = TRUE),
+  county       = paste("County", sample(1:30, 200, replace = TRUE)),
+  city         = paste("City", sample(1:20, 200, replace = TRUE)),
+  cases        = round(rnorm(200, mean = 200, sd = 150)),
+  cases_2021   = round(rnorm(200, mean = 300, sd = 200))
+)
+college_Data$cases[college_Data$cases < 0] <- 0
+college_Data$cases_2021[college_Data$cases_2021 < 0] <- 0
+```
+
+## Structure Inspection
+
+```{r inspect-str}
+str(college_Data)
+```
+
+> `str()` reveals the **structure** of any R object: number of observations, number of variables, variable names, data types, and a preview of values. This is always the **first function** to call on a new dataset.
+
+```{r inspect-glimpse}
+glimpse(college_Data)
+```
+
+> `glimpse()` from `{dplyr}` is a tidyverse-friendly alternative to `str()`. It transposes the output so you can see more variables at once — particularly useful for wide datasets.
+
+```{r inspect-summary}
+summary(college_Data)
+```
+
+> `summary()` provides descriptive statistics for each column: min, Q1, median, mean, Q3, max for numeric columns, and counts for factors.
+
+---
+
+# Part 2: Data Manipulation
+
+## Sorting with `arrange()`
+
+Sort data alphabetically or by any variable:
+
+```{r arrange}
+alphabetical <- college_Data %>%
+  arrange(college)
+
+head(alphabetical, 5)
+```
+
+## Selecting Columns with `select()`
+
+Retain only the columns you need:
+
+```{r select}
+college_cases <- select(college_Data, college, cases)
+head(college_cases)
+```
+
+## Filtering Rows with `filter()`
+
+Extract observations matching a condition:
+
+```{r filter-one-state}
+louisiana_cases <- filter(college_Data, state == "Louisiana")
+nrow(louisiana_cases)
+```
+
+Filter for **multiple states** using the `|` (OR) operator:
+
+```{r filter-south}
+south_cases <- filter(college_Data,
+                      state == "Louisiana" |
+                      state == "Texas"     |
+                      state == "Arkansas"  |
+                      state == "Mississippi")
+
+cat("Rows in southern states subset:", nrow(south_cases), "\n")
+table(south_cases$state)
+```
+
+## Grouping and Tallying
+
+Count observations per group:
+
+```{r group-tally}
+state_cases   <- group_by(college_Data, state)
+days_reported <- tally(state_cases)
+
+days_reported %>% arrange(desc(n))
+```
+
+> `group_by()` + `tally()` tells you how many records each state has contributed — useful for understanding data coverage before visualisation.
+
+---
+
+# Part 3: Scatter Plots
+
+Scatter plots reveal **relationships between two continuous variables**.
+
+## College Data: Cases 2020 vs 2021
+
+```{r scatter-college}
+ggplot(data = college_Data,
+       aes(x = cases, y = cases_2021)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  labs(
+    title = "COVID-19 Cases: 2020 vs 2021 — US Colleges",
+    x     = "Cases (2020)",
+    y     = "Cases (2021)"
+  ) +
+  theme_minimal()
+```
+
+## Iris: Sepal Width vs Sepal Length
+
+```{r scatter-iris}
+ggplot(data = iris,
+       aes(x = Sepal.Width, y = Sepal.Length)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Iris: Sepal Width vs Sepal Length",
+    x     = "Sepal Width (cm)",
+    y     = "Sepal Length (cm)"
+  ) +
+  theme_minimal()
+```
+
+## Adding Colour by a Categorical Variable
+
+Map a third variable to the `color` aesthetic:
+
+```{r scatter-color-college}
+ggplot(data = college_Data,
+       aes(x = cases, y = cases_2021, color = state)) +
+  geom_point(alpha = 0.6) +
+  labs(
+    title = "COVID-19 Cases Coloured by State",
+    x     = "Cases (2020)",
+    y     = "Cases (2021)",
+    color = "State"
+  ) +
+  theme_minimal()
+```
+
+```{r scatter-color-iris}
+ggplot(data = iris,
+       aes(x = Sepal.Width, y = Sepal.Length, color = Species)) +
+  geom_point(alpha = 0.8, size = 2) +
+  labs(
+    title = "Iris: Sepal dimensions coloured by species",
+    x     = "Sepal Width (cm)",
+    y     = "Sepal Length (cm)",
+    color = "Species"
+  ) +
+  theme_minimal()
+```
+
+> **Observation:** The iris data shows that *setosa* (typically lower right) is clearly separated from the other two species. *versicolor* and *virginica* overlap, suggesting that sepal dimensions alone are not sufficient to fully separate them.
+
+---
+
+# Part 4: Histograms
+
+Histograms reveal the **distribution** of a single continuous variable.
+
+## Base R Histogram
+
+```{r hist-base}
+hist(louisiana_cases$cases,
+     freq    = TRUE,
+     breaks  = 10,
+     xlab    = "Total Cases",
+     ylab    = "Frequency",
+     main    = "COVID-19 Cases — Louisiana Colleges",
+     col     = "steelblue",
+     border  = "white")
+```
+
+## ggplot2 Histogram with Fill by Group
+
+```{r hist-gg-college}
+ggplot(data = louisiana_cases, aes(x = cases)) +
+  geom_histogram(binwidth = 100,
+                 color = "black",
+                 aes(fill = county),
+                 alpha = 0.8) +
+  labs(
+    title = "COVID-19 Cases — Louisiana Colleges by County",
+    x     = "Cases",
+    y     = "Frequency"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+```{r hist-gg-iris}
+ggplot(data = iris, aes(x = Sepal.Width)) +
+  geom_histogram(binwidth = 0.2,
+                 color    = "black",
+                 aes(fill = Species),
+                 alpha    = 0.7) +
+  labs(
+    title = "Iris Sepal Width Distribution by Species",
+    x     = "Sepal Width (cm)",
+    y     = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+---
+
+# Part 5: Density Plots
+
+Density plots are **smoothed histograms**. They work well when comparing distributions across multiple groups because overlapping curves are easier to read than overlapping bars.
+
+```{r density-south}
+ggplot(south_cases) +
+  geom_density(aes(x = cases, fill = state), alpha = 0.35) +
+  labs(
+    title = "Distribution of COVID-19 Cases — Southern US States",
+    x     = "Cases",
+    y     = "Density",
+    fill  = "State"
+  ) +
+  theme_minimal()
+```
+
+```{r density-iris}
+ggplot(iris) +
+  geom_density(aes(x = Sepal.Width, fill = Species), alpha = 0.4) +
+  labs(
+    title = "Iris Sepal Width Density by Species",
+    x     = "Sepal Width (cm)",
+    y     = "Density"
+  ) +
+  theme_minimal()
+```
+
+---
+
+# Part 6: Violin Plots
+
+A **violin plot** combines a boxplot with a density estimate, showing both summary statistics and the full distributional shape.
+
+```{r violin-iris}
+ggplot(data = iris,
+       aes(x = Species, y = Sepal.Length, color = Species, fill = Species)) +
+  geom_violin(alpha = 0.4) +
+  geom_boxplot(width = 0.1, color = "black", alpha = 0.8) +
+  labs(
+    title = "Iris Sepal Length by Species — Violin + Boxplot",
+    x     = "Species",
+    y     = "Sepal Length (cm)"
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")
+```
+
+```{r violin-south}
+ggplot(data = south_cases,
+       aes(x = state, y = cases, color = state, fill = state)) +
+  geom_violin(alpha = 0.3) +
+  labs(
+    title = "COVID-19 Cases Distribution — Southern States",
+    x     = "State",
+    y     = "Cases"
+  ) +
+  theme_gray() +
+  theme(legend.position = "none")
+```
+
+---
+
+# Part 7: Residual Plots
+
+A **residual plot** helps you decide whether a linear model is appropriate for your data. After fitting a linear model, plot fitted values on the x-axis and residuals on the y-axis:
+
+- **Random scatter around y = 0** → linear model is appropriate
+- **Pattern (U-shape, funnel)** → linear model is NOT appropriate; consider a non-linear model
+
+```{r residuals-iris}
+ggplot(lm(Sepal.Length ~ Sepal.Width, data = iris)) +
+  geom_point(aes(x = .fitted, y = .resid),
+             alpha = 0.6, color = "steelblue") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    title    = "Residual Plot — Iris: Sepal.Length ~ Sepal.Width",
+    subtitle = "Random scatter around 0 = linear model is reasonable",
+    x        = "Fitted values",
+    y        = "Residuals"
+  ) +
+  theme_minimal()
+```
+
+```{r residuals-south}
+ggplot(lm(cases ~ cases_2021, data = south_cases)) +
+  geom_point(aes(x = .fitted, y = .resid),
+             alpha = 0.6, color = "firebrick") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title    = "Residual Plot — College COVID Cases: 2020 ~ 2021",
+    subtitle = "A pattern here would suggest a non-linear relationship",
+    x        = "Fitted values",
+    y        = "Residuals"
+  ) +
+  theme_minimal()
+```
+
+---
+
+# Part 8: Correlation Analysis
+
+## Pearson Correlation
+
+The standard correlation coefficient for **linear** relationships between two continuous normally distributed variables:
+
+```{r cor-pearson}
+cor(iris$Sepal.Length, iris$Sepal.Width)
+```
+
+## Spearman and Kendall Correlations
+
+For **non-normal** data or **ordinal** variables, use rank-based methods:
+
+```{r cor-methods}
+# Spearman (rank-based, robust to outliers)
+cor(iris$Sepal.Length, iris$Sepal.Width, method = "spearman")
+
+# Kendall's Tau (another rank-based measure)
+cor(iris$Sepal.Length, iris$Sepal.Width, method = "kendall")
+```
+
+| Method | When to use |
+|---|---|
+| Pearson | Both variables are normally distributed, relationship is linear |
+| Spearman | Non-normal data, or presence of outliers |
+| Kendall | Small samples, or ordinal data |
+
+## Significance Test
+
+Test whether the correlation is statistically different from zero:
+
+```{r cor-test}
+cor.test(iris$Sepal.Length, iris$Sepal.Width)
+```
+
+> A p-value < 0.05 means the correlation is statistically significant. The confidence interval tells you the plausible range of the true population correlation.
+
+---
+
+# Part 9: The Tietjen-Moore Outlier Test
+
+The **Tietjen-Moore test** detects a **known number k** of outliers in a univariate dataset assumed to be normally distributed. It is more powerful than the Grubbs test when multiple outliers are suspected.
+
+## The Test Statistic
+
+$$E_k = \frac{\sum_{i=1}^{n-k}(x_i - \bar{x}_{n-k})^2}{\sum_{i=1}^{n}(x_i - \bar{x})^2}$$
+
+- Values close to **1** → no outliers
+- Values close to **0** → strong evidence of outliers
+
+## Implementation
+
+```{r tietjenmoore-function}
+TietjenMoore <- function(dataSeries, k) {
+  n  <- length(dataSeries)
+  
+  # Absolute residuals from the mean
+  r  <- abs(dataSeries - mean(dataSeries))
+  
+  # Sort by residual size
+  df  <- data.frame(dataSeries, r)
+  dfs <- df[order(df$r), ]
+  
+  # Subset excluding the k largest residuals
+  klarge       <- c((n - k + 1):n)
+  subdataSeries <- dfs$dataSeries[-klarge]
+  
+  # Sum of squares: subset vs full
+  ksub <- (subdataSeries - mean(subdataSeries))^2
+  all  <- (df$dataSeries - mean(df$dataSeries))^2
+  
+  sum(ksub) / sum(all)
+}
+
+findoutliersTietjenMooreTest <- function(dataSeries, k, alpha = 0.05) {
+  ek <- TietjenMoore(dataSeries, k)
+  
+  # Generate reference distribution via simulation (10,000 normal samples)
+  test <- numeric(10000)
+  for (i in 1:10000) {
+    sim     <- rnorm(length(dataSeries))
+    test[i] <- TietjenMoore(sim, k)
+  }
+  
+  Talpha <- quantile(test, alpha)
+  list(T = ek, Talpha = Talpha,
+       conclusion = ifelse(ek < Talpha,
+                           "Evidence of outliers (T < Talpha)",
+                           "No significant outliers (T >= Talpha)"))
+}
+```
+
+## Application to the Iris Dataset
+
+```{r tietjenmoore-apply}
+# Test Petal.Width for 4 potential outliers
+par(mfrow = c(1, 2))
+boxplot(iris$Petal.Width,  main = "Petal Width",  ylab = "cm")
+boxplot(iris$Petal.Length, main = "Petal Length", ylab = "cm")
+par(mfrow = c(1, 1))
+```
+
+```{r tietjenmoore-test}
+set.seed(123)  # For reproducibility of the simulation
+
+result_pw <- findoutliersTietjenMooreTest(iris$Petal.Width, k = 4)
+cat("Petal Width — T:", round(result_pw$T, 4),
+    "| Talpha:", round(result_pw$Talpha, 4),
+    "| Result:", result_pw$conclusion, "\n")
+
+result_pl <- findoutliersTietjenMooreTest(iris$Petal.Length, k = 2)
+cat("Petal Length — T:", round(result_pl$T, 4),
+    "| Talpha:", round(result_pl$Talpha, 4),
+    "| Result:", result_pl$conclusion, "\n")
+```
+
+---
+
+# Part 10: Probability and Normal Distribution Functions
+
+Understanding the normal distribution is fundamental for statistical inference.
+
+## The Four Normal Distribution Functions
+
+| Function | Question it answers |
+|---|---|
+| `dnorm(x, mean, sd)` | What is the probability **density** at value x? |
+| `pnorm(x, mean, sd)` | What is the probability of getting a value **≤ x**? |
+| `qnorm(p, mean, sd)` | What value corresponds to the **p-th percentile**? |
+| `rnorm(n, mean, sd)` | Generate **n random values** from this distribution |
+
+```{r normal-dist-setup}
+sepal.mean <- mean(iris$Sepal.Length)
+sepal.sd   <- sd(iris$Sepal.Length)
+
+cat("Sepal Length mean:", round(sepal.mean, 3), "\n")
+cat("Sepal Length SD:  ", round(sepal.sd, 3), "\n")
+```
+
+## Density Function (`dnorm`)
+
+```{r dnorm-plot}
+sepal.density <- dnorm(iris$Sepal.Length,
+                       mean = sepal.mean,
+                       sd   = sepal.sd)
+
+sepal.df <- data.frame(sepal = iris$Sepal.Length,
+                       density = sepal.density)
+
+ggplot(sepal.df, aes(x = sepal, y = density)) +
+  geom_point(color = "steelblue", alpha = 0.7) +
+  geom_line(stat = "smooth", method = "loess", color = "red", se = FALSE) +
+  labs(
+    title = "Probability density of Iris Sepal Length",
+    x     = "Sepal Length (cm)",
+    y     = "Density"
+  ) +
+  theme_minimal()
+```
+
+## Cumulative Distribution Function (`pnorm`)
+
+```{r pnorm-plot}
+sepal.cum <- pnorm(iris$Sepal.Length,
+                   mean = sepal.mean,
+                   sd   = sepal.sd)
+
+sepal.cdf <- data.frame(sepal = iris$Sepal.Length, cumulative = sepal.cum)
+
+ggplot(sepal.cdf, aes(x = sepal, y = cumulative)) +
+  geom_point(color = "darkorange", alpha = 0.7) +
+  labs(
+    title    = "Cumulative distribution of Iris Sepal Length",
+    subtitle = "P(X ≤ x) — the probability that sepal length is at most x",
+    x        = "Sepal Length (cm)",
+    y        = "Cumulative probability"
+  ) +
+  theme_minimal()
+```
+
+## Quantile Function (`qnorm`) and Random Sampling (`rnorm`)
+
+```{r qnorm}
+# What sepal length represents the bottom 1% of the distribution?
+bottom_1pct <- qnorm(0.01, mean = sepal.mean, sd = sepal.sd)
+cat("Bottom 1% of sepal length:", round(bottom_1pct, 3), "cm\n")
+
+# What value cuts off the top 5%?
+top_5pct <- qnorm(0.95, mean = sepal.mean, sd = sepal.sd)
+cat("Top 5% threshold:", round(top_5pct, 3), "cm\n")
+```
+
+```{r rnorm-demo, fig.height=4}
+set.seed(42)
+small_sample <- rnorm(50,   mean = sepal.mean, sd = sepal.sd)
+large_sample <- rnorm(5000, mean = sepal.mean, sd = sepal.sd)
+
+p_small <- ggplot(data.frame(x = small_sample), aes(x)) +
+  geom_histogram(bins = 10, fill = "steelblue", color = "white") +
+  labs(title = "n = 50 samples", x = "Sepal Length") +
+  theme_minimal()
+
+p_large <- ggplot(data.frame(x = large_sample), aes(x)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  labs(title = "n = 5000 samples", x = "Sepal Length") +
+  theme_minimal()
+
+gridExtra::grid.arrange(p_small, p_large, ncol = 2)
+```
+
+> **Central Limit Theorem in action:** With only 50 samples, the histogram is ragged. With 5000 samples, the bell curve shape becomes clearly visible.
+
+---
+
+# Part 11: Shapiro-Wilk Normality Test
+
+Before using parametric tests (t-test, ANOVA, Pearson correlation), verify that your data is normally distributed:
+
+- $H_0$: The data **comes from** a normal distribution
+- $H_1$: The data **does not come from** a normal distribution
+
+```{r shapiro-small}
+# Small sample (n = 5) — low power
+shapiro.test(iris$Sepal.Length[1:5])
+```
+
+```{r shapiro-full}
+# Full sample (n = 150)
+shapiro.test(iris$Sepal.Length)
+```
+
+> **Interpretation:** With a very small sample (n = 5), we lack power to detect non-normality. With the full sample (n = 150), the p-value is significant — meaning the sepal lengths are **not** perfectly normally distributed. However, with large samples, the Shapiro-Wilk test is very sensitive and may reject normality even for minor departures that are practically unimportant. Always pair the test with a Q-Q plot:
+
+```{r qqplot}
+qqnorm(iris$Sepal.Length, main = "Q-Q Plot — Iris Sepal Length")
+qqline(iris$Sepal.Length, col = "red", lwd = 2)
+```
+
+> If points follow the red line closely, the data is approximately normal.
+
+---
+
+# Summary
+
+| Topic | Key Function(s) |
+|---|---|
+| Data inspection | `str()`, `glimpse()`, `summary()` |
+| Manipulation | `arrange()`, `select()`, `filter()`, `group_by()`, `tally()` |
+| Scatter plot | `geom_point()` |
+| Histogram | `geom_histogram()` |
+| Density plot | `geom_density()` |
+| Violin plot | `geom_violin()` |
+| Residual plot | `ggplot(lm(...)) + geom_point(aes(.fitted, .resid))` |
+| Correlation | `cor()`, `cor.test()` |
+| Tietjen-Moore test | Custom function (T close to 0 = outliers present) |
+| Normal distribution | `dnorm()`, `pnorm()`, `qnorm()`, `rnorm()` |
+| Normality test | `shapiro.test()` |
+
+---
+
+# Practice Exercises
+
+1. Load the `mtcars` dataset. Use `str()`, `glimpse()`, and `summary()` to describe its structure. How many numeric and how many factor-type variables are there?
+
+2. Filter `mtcars` to keep only cars with 6 or 8 cylinders (`cyl`). Create a density plot of `mpg` for these two groups with different fill colours.
+
+3. Fit a linear model `mpg ~ wt` on the full `mtcars` dataset. Create a residual plot. Is the linear model appropriate?
+
+4. Use `cor.test()` to test the correlation between `hp` and `mpg` in `mtcars`. Report the Pearson r, p-value, and 95% confidence interval. Is the relationship significant?
+
+5. *Challenge:* Apply the Tietjen-Moore test to `iris$Sepal.Width` for k = 3 potential outliers. Compare with a boxplot. Do the results agree?
+
+---
+
+# References
+
+- Tukey, J. W. (1977). *Exploratory Data Analysis*. Addison-Wesley.
+- Wickham, H. & Grolemund, G. (2017). *R for Data Science*. https://r4ds.had.co.nz
+- Tietjen, G. L., Moore, R. H. (1972). Some Grubbs-type statistics for the detection of several outliers. *Technometrics*, 14(3), 583–597.

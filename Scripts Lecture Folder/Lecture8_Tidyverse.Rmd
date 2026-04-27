@@ -1,0 +1,835 @@
+---
+title: "The Tidyverse — A Comprehensive Lecture"
+subtitle: "Data Import, Manipulation, Reshaping, and String/Factor Handling"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    theme: flatly
+    highlight: tango
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  comment = "##"
+)
+```
+
+---
+
+# What is the Tidyverse?
+
+The **tidyverse** is a collection of R packages designed around a shared philosophy: data should be tidy, code should be readable, and operations should be composable. All packages share a consistent syntax, consistent function naming conventions, and a common data structure — the **tibble**.
+
+```{r load-tidyverse}
+library(tidyverse)
+```
+
+The eight core packages are:
+
+| Package | Purpose |
+|---|---|
+| **dplyr** | Data manipulation — the backbone of the tidyverse |
+| **ggplot2** | Data visualization |
+| **tidyr** | Reshaping and tidying tabular data |
+| **readr** | Fast, consistent data import |
+| **purrr** | Functional programming — apply functions over lists |
+| **stringr** | String (text) manipulation |
+| **forcats** | Factor (categorical variable) manipulation |
+| **tibble** | Modern, improved data frames |
+
+> 💡 **Cheat sheets** for every tidyverse package are available at: <https://posit.co/resources/cheatsheets/>
+
+---
+
+# The Pipe Operator `%>%`
+
+The pipe is the most important concept in the tidyverse. It takes the result on the **left** and passes it as the **first argument** to the function on the **right**.
+
+```r
+data %>% function1() %>% function2() %>% function3()
+```
+
+This replaces deeply nested code like `function3(function2(function1(data)))` with a readable left-to-right chain.
+
+```{r pipe-demo}
+# Without pipe — hard to read
+head(summary(starwars))
+
+# With pipe — reads like a sentence
+starwars %>%
+  summary() %>%
+  head()
+
+# Practical example: select, filter, summarise in one chain
+starwars %>%
+  select(name, height, mass, species) %>%
+  filter(!is.na(height)) %>%
+  summarise(mean_height = mean(height),
+            n = n())
+```
+
+> 💡 **Keyboard shortcut:** `Ctrl + Shift + M` (Windows/Linux) or `Cmd + Shift + M` (Mac) inserts `%>%`.
+
+R 4.1+ also introduced a native pipe `|>` which works similarly in most contexts.
+
+---
+
+# dplyr — Data Manipulation
+
+`dplyr` is the backbone of the tidyverse. It provides a small set of powerful, composable functions — each doing one thing well.
+
+## `select()` — Choose Columns
+
+`select()` picks columns by name, position, or helper functions.
+
+```{r select-basic}
+# By name
+starwars %>% select(name, height, mass)
+
+# By position range
+starwars %>% select(1:4)
+
+# Exclude a column with minus
+starwars %>% select(-homeworld)
+
+# Rename while selecting
+starwars %>% select(character = name, height, mass)
+```
+
+### `select()` helper functions
+
+```{r select-helpers}
+# Columns whose name ends with "color"
+starwars %>% select(ends_with("color"))
+
+# Columns whose name starts with a pattern
+starwars %>% select(starts_with("s"))
+
+# Select only numeric columns
+starwars %>% select(where(is.numeric))
+
+# Select last column then everything else (reorder)
+starwars %>% select(last_col(), name, everything())
+```
+
+## `filter()` — Choose Rows
+
+`filter()` keeps rows that satisfy one or more logical conditions.
+
+```{r filter-basic}
+# Single condition
+starwars %>% filter(species == "Human")
+
+# Multiple conditions (AND)
+starwars %>%
+  filter(species == "Human" & height < 180 & !is.na(mass))
+
+# OR condition with %in%
+starwars %>%
+  filter(eye_color %in% c("blue", "brown"))
+
+# Range filtering
+starwars %>% filter(between(mass, 50, 100))
+```
+
+> ⚠️ Use `==` for comparison, not `=`. Use `%in%` when testing membership in a set of values.
+
+## `mutate()` — Create or Modify Columns
+
+`mutate()` adds new columns or overwrites existing ones. All other columns are preserved.
+
+```{r mutate-basic}
+# Create a new column
+starwars %>%
+  select(name, height, mass) %>%
+  mutate(height_m = height / 100)
+
+# Create multiple columns at once
+starwars %>%
+  mutate(height_m = height / 100,
+         bmi      = mass / (height / 100)^2,
+         .before  = name)
+```
+
+### Conditional column creation with `ifelse()` and `case_when()`
+
+```{r mutate-conditional}
+# Simple binary condition
+starwars %>%
+  mutate(size = ifelse(height > 180, "Tall", "Short"), .before = name)
+
+# Multiple conditions with case_when — much cleaner than nested ifelse
+starwars %>%
+  mutate(size = case_when(
+    height > 200        ~ "Very tall",
+    height > 180        ~ "Tall",
+    height > 150        ~ "Average",
+    TRUE                ~ "Short"       # default (else)
+  ), .before = name)
+```
+
+> 💡 `case_when()` from `dplyr` is the best alternative to deeply nested `ifelse()` calls. Each condition is written as `condition ~ result`. The last `TRUE ~ ...` acts as the default.
+
+### `transmute()` — Create columns and drop the rest
+
+```{r transmute}
+# Keep only the new columns
+starwars %>%
+  transmute(character = name,
+            height_m  = height / 100)
+```
+
+## `arrange()` — Sort Rows
+
+```{r arrange}
+# Ascending order (default)
+msleep %>% select(name, sleep_total) %>% arrange(sleep_total)
+
+# Descending order
+msleep %>% select(name, sleep_total) %>% arrange(desc(sleep_total))
+
+# Sort alphabetically by name within each order group
+msleep %>%
+  select(order, name, sleep_total) %>%
+  group_by(order) %>%
+  arrange(name, .by_group = TRUE)
+```
+
+## `rename()` — Rename Columns
+
+```{r rename}
+starwars %>%
+  select(name, height, mass) %>%
+  rename(character = name,
+         weight    = mass)
+```
+
+## `summarise()` — Aggregate Data
+
+`summarise()` reduces a data frame to a single row (or one row per group). It does **not** preserve other columns.
+
+```{r summarise}
+# Overall summary
+starwars %>%
+  drop_na(height, mass) %>%
+  summarise(mean_height = mean(height),
+            mean_mass   = mean(mass),
+            n           = n())
+```
+
+## `group_by()` — Apply Operations by Group
+
+`group_by()` combined with `summarise()` or `mutate()` is one of the most powerful patterns in dplyr.
+
+```{r group-by}
+# Summary statistics by group
+starwars %>%
+  filter(sex %in% c("male", "female")) %>%
+  drop_na(height, mass) %>%
+  group_by(sex) %>%
+  summarise(avg_height = mean(height),
+            avg_mass   = mean(mass),
+            count      = n())
+```
+
+```{r group-by-mutate}
+# Add group mean as a new column (mutate keeps all rows)
+starwars %>%
+  group_by(species) %>%
+  mutate(mean_height_species = mean(height, na.rm = TRUE)) %>%
+  select(name, species, height, mean_height_species)
+```
+
+Always `ungroup()` after grouped operations if you want to do further non-grouped work:
+
+```{r ungroup}
+starwars %>%
+  group_by(species) %>%
+  summarise(n = n()) %>%
+  ungroup() %>%
+  arrange(desc(n))
+```
+
+## `count()` — Count Occurrences
+
+```{r count}
+# Simple count
+starwars %>% count(species)
+
+# Sort by frequency
+starwars %>% count(species, sort = TRUE)
+
+# Two-way count
+starwars %>% count(species, gender, sort = TRUE)
+
+# Round a numeric variable before counting
+starwars %>% count(round(birth_year, -1))
+```
+
+## `slice()` — Select Rows by Position
+
+```{r slice}
+# Rows 11 to 15
+starwars %>% slice(11:15)
+
+# Last row
+starwars %>% slice(n())
+
+# Top 3 tallest characters in 2007
+starwars %>%
+  arrange(desc(height)) %>%
+  slice(1:3) %>%
+  select(name, height)
+```
+
+## `lag()` and `lead()` — Look Back and Forward
+
+```{r lag-lead}
+library(gapminder)
+
+# Calculate year-on-year change in life expectancy for Australia
+gapminder %>%
+  filter(country == "Australia") %>%
+  arrange(year) %>%
+  mutate(lifeExp_change = lifeExp - lag(lifeExp))
+```
+
+## `recode()` — Recode Variable Values
+
+```{r recode}
+starwars %>%
+  mutate(species = recode(species, "Droid" = "Robot")) %>%
+  select(name, species) %>%
+  head(8)
+```
+
+## `sample_n()` and `sample_frac()` — Random Sampling
+
+```{r sampling}
+# Random sample of 5 rows
+starwars %>% sample_n(5)
+
+# Random 10% of rows
+starwars %>% sample_frac(0.10)
+```
+
+---
+
+# tidyr — Reshaping Data
+
+`tidyr` handles the **structure** of your data. The two most important concepts are:
+
+- **Long format:** Each row is one observation of one variable (ideal for ggplot2 and most analysis).
+- **Wide format:** Each row is one subject with multiple variable columns (common in raw data export).
+
+## `pivot_longer()` — Wide to Long
+
+```{r pivot-longer}
+# Convert height and mass from columns into rows
+starwars %>%
+  select(name, height, mass) %>%
+  pivot_longer(cols      = c(height, mass),
+               names_to  = "measurement",
+               values_to = "value") %>%
+  arrange(name)
+```
+
+## `pivot_wider()` — Long to Wide
+
+```{r pivot-wider}
+# Show housing sales by year across cities (one year per column)
+txhousing %>%
+  filter(month == 1) %>%
+  select(city, year, sales) %>%
+  pivot_wider(names_from  = year,
+              values_from = sales)
+```
+
+## `separate()` — Split One Column into Several
+
+```{r separate}
+starwars %>%
+  select(name, homeworld) %>%
+  separate(col  = name,
+           into = c("first_name", "last_name"),
+           sep  = " ",
+           extra = "merge")
+```
+
+## `unite()` — Merge Several Columns into One
+
+```{r unite}
+starwars %>%
+  select(name, sex, gender) %>%
+  unite("sex_gender", sex, gender, sep = " / ")
+```
+
+## `drop_na()` and `replace_na()`
+
+```{r missing-values}
+# Drop rows with any NA
+starwars %>% drop_na()
+
+# Drop NA in specific columns only
+starwars %>% drop_na(height, mass)
+
+# Replace NA with a value
+starwars %>%
+  select(name, hair_color) %>%
+  replace_na(list(hair_color = "unknown"))
+```
+
+---
+
+# Data Cleaning — Practical Patterns
+
+## Cleaning Column Names
+
+```{r clean-names}
+# Base R: make syntactically valid names
+dirty_df <- data.frame(
+  "First Name" = c("Alice", "Bob"),
+  "Age (years)" = c(25, 30)
+)
+make.names(names(dirty_df))
+
+# janitor package — recommended for messy column names
+# install.packages("janitor")
+# library(janitor)
+# clean_names(dirty_df)  # converts to snake_case automatically
+```
+
+## Variable Type Conversion
+
+```{r type-conversion}
+# Check types
+class(starwars$name)
+is.numeric(starwars$height)
+
+# Convert types
+as.integer(c(3.7, 5.2, 8.9))
+as.character(42)
+as.numeric(TRUE)   # TRUE = 1
+as.numeric(FALSE)  # FALSE = 0
+```
+
+## Handling Missing Values with `case_when()`
+
+```{r case-when-na}
+data_ex <- data.frame(
+  permis          = c("Yes", "No", "Yes", "No", "No"),
+  accident_driving = c(0.01, NA, 0.02, NA, NA),
+  accident_other   = c(0.02, 0.01, NA, 0.02, NA)
+)
+
+# Nested ifelse — too complex, error-prone
+# case_when is the clean solution
+data_ex %>%
+  mutate(total_risk = case_when(
+    is.na(accident_driving) & is.na(accident_other) ~ 0,
+    is.na(accident_driving)                          ~ accident_other,
+    is.na(accident_other)                            ~ accident_driving,
+    TRUE                                             ~ accident_driving + accident_other
+  ))
+```
+
+---
+
+# stringr — String Manipulation
+
+`stringr` provides a consistent set of functions for working with text. All function names start with `str_`, making them easy to discover and remember.
+
+```{r stringr-load}
+library(stringr)
+```
+
+## Basic Operations
+
+```{r str-basic}
+text <- c("Hello, World!", NA, "  tidyverse  ", "R programming", "42")
+
+# String length
+str_length(text)
+
+# Change case
+str_to_upper(text)
+str_to_lower(text)
+str_to_title(text)
+str_to_sentence(text)
+
+# Trim whitespace
+str_trim(text)
+
+# Sort strings
+str_sort(na.omit(text))
+```
+
+## Combining Strings
+
+```{r str-combine}
+# Concatenate two strings
+str_c("Hello", "World", sep = " ")
+
+# Collapse a vector into one string
+str_c(c("R", "Python", "Julia"), collapse = ", ")
+
+# Glue variables into a string template
+name <- "Ange"
+age  <- 25
+str_glue("My name is {name} and I am {age} years old.")
+
+# Apply glue across a data frame
+df_names <- tibble(
+  name = c("Alice", "Bob", "Carla"),
+  score = c(88, 95, 72)
+)
+df_names %>% str_glue_data("{name} scored {score} points.")
+```
+
+## Detecting Patterns
+
+```{r str-detect}
+fruits <- c("pomme", "banane", "orange", "ananas")
+
+# Does the string contain "an"?
+str_detect(fruits, "an")
+
+# Does it start with "or"?
+str_starts(fruits, "or")
+
+# Does it end with "ne"?
+str_ends(fruits, "ne")
+
+# Practical use — filter with str_detect
+starwars %>%
+  filter(str_detect(name, "Sky")) %>%
+  select(name, species)
+```
+
+## Extracting Patterns
+
+```{r str-extract}
+email_text <- "Contact us at: info@example.com or support@company.org"
+
+# Extract first email
+str_extract(email_text, "\\w+@\\w+\\.\\w+")
+
+# Extract all emails
+str_extract_all(email_text, "\\w+@\\w+\\.\\w+")
+```
+
+## Replacing Patterns
+
+```{r str-replace}
+# Replace first occurrence
+str_replace("banana", "a", "o")
+
+# Replace all occurrences
+str_replace_all("banana", "a", "o")
+
+# Practical: clean up a column
+starwars %>%
+  mutate(hair_clean = str_replace(hair_color, "brown", "chestnut")) %>%
+  select(name, hair_color, hair_clean) %>%
+  head(6)
+```
+
+## Removing Patterns
+
+```{r str-remove}
+# Remove first match
+str_remove("Hello, World!", ",")
+
+# Remove all matches
+str_remove_all("2024-01-15", "-")
+
+# Extract first names from Star Wars
+starwars %>%
+  mutate(first_name = str_remove_all(name, "\\s\\w+"),
+         .after = name) %>%
+  select(name, first_name) %>%
+  head(8)
+```
+
+## Splitting and Subsetting
+
+```{r str-split}
+sentence <- "The tidyverse is amazing"
+
+# Split into words
+str_split(sentence, " ")
+
+# As a simple vector
+str_split_1(sentence, " ")
+
+# Extract characters 1-3
+str_sub(sentence, 1, 3)
+
+# Extract the 2nd word
+word(sentence, 2)
+```
+
+## Key `stringr` Functions Summary
+
+| Function | Purpose |
+|---|---|
+| `str_length()` | Count characters |
+| `str_c()` | Concatenate strings |
+| `str_glue()` | Insert values into a string template |
+| `str_to_upper/lower/title()` | Change case |
+| `str_trim()` | Remove leading/trailing whitespace |
+| `str_detect()` | Does string match a pattern? (TRUE/FALSE) |
+| `str_extract()` | Extract first matching pattern |
+| `str_replace()` | Replace first match |
+| `str_replace_all()` | Replace all matches |
+| `str_remove()` | Remove first match |
+| `str_remove_all()` | Remove all matches |
+| `str_split()` | Split string by a delimiter |
+| `str_sub()` | Extract substring by position |
+| `str_count()` | Count occurrences of a pattern |
+
+---
+
+# forcats — Factor (Categorical Variable) Manipulation
+
+**Factors** are R's way of representing categorical variables. They store values as integers internally but display as labels. This matters for models, plots, and sorting.
+
+```{r forcats-load}
+library(forcats)
+```
+
+## Creating and Inspecting Factors
+
+```{r factor-basics}
+# Create a factor
+fruits <- factor(c("pomme", "banane", "pomme", "cerise"))
+fruits
+levels(fruits)   # current level order (alphabetical by default)
+nlevels(fruits)  # number of levels
+
+# Convert in a data frame
+starwars %>%
+  mutate(sex = factor(sex)) %>%
+  pull(sex) %>%
+  levels()
+```
+
+## Reordering Levels
+
+The order of factor levels controls how categories appear in plots and models.
+
+```{r fct-reorder}
+# Manually set level order
+fct_relevel(fruits, "cerise", "banane", "pomme")
+
+# Order by frequency (most common first)
+fct_infreq(fruits)
+
+# Order by first appearance in the data
+fct_inorder(fruits)
+
+# Reverse current order
+fct_rev(fruits)
+
+# Order by a numeric variable (great for plots)
+points <- data.frame(
+  student = factor(c("Alice", "Bob", "Carla", "David")),
+  score   = c(85, 95, 72, 88)
+)
+
+fct_reorder(points$student, points$score) %>% levels()
+```
+
+### Practical use: sorted bar chart
+
+```{r fct-infreq-plot}
+starwars %>%
+  drop_na(species) %>%
+  mutate(species = fct_lump(species, n = 5)) %>%
+  ggplot(aes(y = fct_infreq(species))) +
+  geom_bar(fill = "steelblue") +
+  theme_bw() +
+  labs(title = "Most Common Species in Star Wars",
+       x = "Count", y = NULL)
+```
+
+## Renaming and Recoding Levels
+
+```{r fct-recode}
+x <- factor(c("a", "b", "c", "a", "b"))
+levels(x)
+
+# Recode specific levels
+fct_recode(x,
+           "Apple"  = "a",
+           "Banana" = "b",
+           "Cherry" = "c")
+```
+
+## Collapsing Levels
+
+```{r fct-collapse}
+# Manually merge levels into groups
+x2 <- factor(c("auburn", "auburn, grey", "brown", "brown, grey", "blonde"))
+
+fct_collapse(x2,
+             auburn = c("auburn", "auburn, grey"),
+             brown  = c("brown", "brown, grey"))
+```
+
+## Lumping Rare Levels into "Other"
+
+```{r fct-lump}
+# Keep top 3 most frequent levels, collapse the rest into "Other"
+starwars %>%
+  mutate(species = fct_lump_n(species, n = 3)) %>%
+  count(species, sort = TRUE)
+
+# Keep levels appearing in at least 5% of data
+starwars %>%
+  mutate(species = fct_lump_prop(species, prop = 0.05)) %>%
+  count(species, sort = TRUE)
+```
+
+## Managing NA Levels
+
+```{r fct-na}
+animals <- c("cat", "dog", NA, "cat", "bird", NA)
+
+# Convert NA to an explicit level
+fct_na_value_to_level(animals, level = "Unknown")
+```
+
+## Key `forcats` Functions Summary
+
+| Function | Purpose |
+|---|---|
+| `factor()` | Create a factor |
+| `levels()` | Get or set level names |
+| `fct_relevel()` | Manually reorder levels |
+| `fct_infreq()` | Order by frequency |
+| `fct_inorder()` | Order by appearance |
+| `fct_rev()` | Reverse level order |
+| `fct_reorder()` | Order by a numeric variable |
+| `fct_recode()` | Rename specific levels |
+| `fct_collapse()` | Merge levels into groups |
+| `fct_lump_n()` | Keep top n levels, collapse rest |
+| `fct_lump_prop()` | Keep levels above a frequency threshold |
+| `fct_drop()` | Remove unused levels |
+| `fct_count()` | Count occurrences of each level |
+
+---
+
+# purrr — Functional Programming
+
+`purrr` provides tools to apply functions over lists or vectors in a consistent, type-safe way. It is the tidyverse replacement for the `apply` family.
+
+## `map()` — Apply a Function to Each Element
+
+```{r map-basic}
+# Apply mean() to each column of a data frame
+map(mtcars, mean)
+
+# map_dbl returns a numeric vector instead of a list
+map_dbl(mtcars, mean)
+
+# map_df: apply and bind results into a data frame
+map_df(list(mtcars, mtcars), head, n = 2)
+```
+
+## `map()` with Custom Functions
+
+```{r map-custom}
+# Apply a custom function
+numbers <- list(a = 1:10, b = 11:20, c = 21:30)
+
+map_dbl(numbers, ~ mean(.x) ^ 2)
+
+# Equivalent using an anonymous function
+map_dbl(numbers, function(x) mean(x)^2)
+```
+
+## Practical Use: Import Multiple Files
+
+```{r map-files, eval=FALSE}
+# Import all CSV files in a directory into one data frame
+csv_files <- list.files(pattern = "\\.csv$", full.names = TRUE)
+all_data  <- map_dfr(csv_files, read_csv)
+```
+
+---
+
+# Complete Workflow Example
+
+Here is a realistic end-to-end data analysis pipeline using multiple tidyverse packages together.
+
+```{r full-workflow}
+library(gapminder)
+
+gapminder %>%
+  # 1. Filter to recent data
+  filter(year == 2007) %>%
+
+  # 2. Select relevant columns and rename
+  select(country,
+         continent,
+         life_exp  = lifeExp,
+         gdp       = gdpPercap,
+         pop) %>%
+
+  # 3. Create new variables
+  mutate(
+    gdp_log     = log10(gdp),
+    pop_million = pop / 1e6,
+    wealth      = case_when(
+      gdp > 30000  ~ "High income",
+      gdp > 10000  ~ "Middle income",
+      TRUE         ~ "Low income"
+    )
+  ) %>%
+
+  # 4. Summarise by continent
+  group_by(continent, wealth) %>%
+  summarise(
+    mean_life_exp = round(mean(life_exp), 1),
+    countries     = n(),
+    .groups       = "drop"
+  ) %>%
+
+  # 5. Sort results
+  arrange(continent, desc(mean_life_exp))
+```
+
+---
+
+# Practice Exercises
+
+**Exercise 1 — dplyr basics.** Using the `starwars` dataset, select only human characters who are taller than 170 cm. Keep only the `name`, `height`, `mass`, and `homeworld` columns. Create a new column `bmi = mass / (height/100)^2`. Sort by BMI in descending order.
+
+**Exercise 2 — group_by + summarise.** Using `gapminder`, for each continent and year, compute the mean life expectancy, total population, and the number of countries. Filter to years after 1990 and display the top result per continent (highest mean life expectancy).
+
+**Exercise 3 — tidyr reshaping.** Using `starwars`, select `name`, `height`, and `mass`. Convert to long format with `pivot_longer()` so you have columns `name`, `metric`, and `value`. Then pivot back to wide format with `pivot_wider()` and verify you get the original structure.
+
+**Exercise 4 — stringr.** From the `starwars` dataset, extract only the first name of each character (everything before the first space). Filter to characters whose first name has more than 5 characters. Count how many times the letter "a" appears in each of those names.
+
+**Exercise 5 — forcats.** Using the `starwars` dataset, convert `species` into a factor. Collapse all species with fewer than 3 characters into "Other". Create a bar chart with species on the y-axis, ordered by frequency (most frequent at the top).
+
+**Exercise 6 — Full pipeline.** Using the `msleep` dataset, build a pipeline that: (1) removes rows with missing `sleep_rem` or `vore`; (2) creates a `sleep_ratio` column as `sleep_rem / sleep_total`; (3) groups by `vore`; (4) summarises the mean sleep ratio and count per group; (5) sorts by mean sleep ratio descending; (6) renames `vore` to `diet_type`. Present the final result.
+
+---
+
+```{r cleanup, include=FALSE}
+rm(list = ls())
+```
+
+---
+
+*End of Lecture — The Tidyverse in R*

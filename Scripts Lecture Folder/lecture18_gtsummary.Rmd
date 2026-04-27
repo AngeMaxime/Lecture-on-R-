@@ -1,0 +1,749 @@
+---
+title: "Le Package {gtsummary} en R"
+subtitle: "Tableaux de synthèse reproductibles pour la recherche clinique"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+---
+
+# Pourquoi {gtsummary} ?
+
+La recherche médicale souffre d'une **crise de reproductibilité**. L'une des causes : un code de mauvaise qualité, difficile à relire, sujet aux erreurs, et fastidieux à reproduire.
+
+`{gtsummary}` répond à ce problème en permettant de produire des **tableaux statistiques publiables** directement depuis R, avec des paramètres sensibles par défaut mais entièrement personnalisables.
+
+**Types de tableaux supportés :**
+
+| Fonction | Usage |
+|----------|-------|
+| `tbl_summary()` | Table 1 — statistiques descriptives |
+| `tbl_cross()` | Tableau croisé n × m |
+| `tbl_regression()` | Résultats de modèles de régression |
+| `tbl_uvregression()` | Modèles univariés en série |
+| `tbl_survfit()` | Données de survie |
+| `tbl_svysummary()` | Données d'enquête pondérées |
+| `tbl_merge()` / `tbl_stack()` | Combiner plusieurs tableaux |
+
+---
+
+# Installation et données
+
+## Chargement des packages
+
+```{r}
+library(gtsummary)
+library(tidyverse)
+library(survival)
+```
+
+## Le dataset `trial`
+
+`{gtsummary}` inclut le dataset `trial` : 200 patients simulés recevant le **Drug A** ou le **Drug B**, avec des caractéristiques de base.
+
+```{r}
+# Aperçu des données
+head(trial) |> gt::gt()
+```
+
+```{r}
+dim(trial)
+```
+
+## Sélection d'un sous-ensemble de travail
+
+```{r}
+sm_trial <- trial |>
+  select(trt, age, grade, marker, response)
+```
+
+| Variable | Description |
+|----------|-------------|
+| `trt` | Traitement (Drug A / Drug B) |
+| `age` | Âge |
+| `grade` | Grade tumoral pathologique |
+| `marker` | Niveau du marqueur |
+| `response` | Réponse tumorale (0/1) |
+
+---
+
+# `tbl_summary()` — Table descriptive
+
+## Usage de base
+
+```{r}
+tbl_summary_1 <-
+  sm_trial |>
+  select(-trt) |>
+  tbl_summary()
+
+tbl_summary_1
+```
+
+**Comportements par défaut :**
+
+- Variables **continues** → médiane (IQR)
+- Variables **catégorielles / dichotomiques** → n (%)
+- Variables **0/1, TRUE/FALSE, OUI/NON** → traitées comme dichotomiques (une seule ligne affichée)
+- Valeurs manquantes listées sous **"Unknown"**
+- Labels définis via le package `{labelled}` affichés automatiquement
+
+## Personnalisation avec `tbl_summary()`
+
+```{r}
+tbl_summary_2 <-
+  sm_trial |>
+  tbl_summary(
+    by        = trt,                             # Stratifier par traitement
+    type      = age ~ "continuous2",             # Afficher sur 2 lignes
+    statistic = list(
+      age      ~ c("{mean} ({sd})", "{min}, {max}"),
+      response ~ "{n} / {N} ({p}%)"
+    ),
+    label  = grade ~ "Grade tumoral pathologique",
+    digits = age ~ 1
+  )
+
+tbl_summary_2
+```
+
+**Arguments clés :**
+
+| Argument | Rôle |
+|----------|------|
+| `by` | Variable de stratification (colonnes) |
+| `type` | Type de résumé : `"continuous"`, `"continuous2"`, `"categorical"`, `"dichotomous"` |
+| `statistic` | Statistiques à afficher (notation `{mean}`, `{sd}`, `{n}`, `{p}`, etc.) |
+| `label` | Renommer les variables dans le tableau |
+| `digits` | Nombre de décimales |
+
+> 💡 **Notation formula :** `variable ~ "valeur"` pour une variable, `list(var1 ~ ..., var2 ~ ...)` pour plusieurs.
+
+---
+
+# Fonctions `add_*()` — Enrichir le tableau
+
+## `add_p()` et `add_q()` — P-values et corrections
+
+```{r}
+tbl_summary_3a <-
+  sm_trial |>
+  tbl_summary(by = trt) |>
+  add_p() |>                              # P-values brutes
+  add_q(method = "bonferroni")            # Correction pour tests multiples
+
+tbl_summary_3a
+```
+
+- `add_p()` — p-value par test automatique (t-test, chi², Wilcoxon…)
+- `add_q()` — p-value ajustée via `p.adjust()` (Bonferroni, BH, etc.)
+
+## `add_difference()` — Différences entre groupes
+
+```{r}
+tbl_summary_3b <-
+  trial |>
+  select(trt, marker, response) |>
+  tbl_summary(
+    by        = trt,
+    statistic = list(marker   ~ "{mean} ({sd})",
+                     response ~ "{p}%"),
+    missing = "no"
+  ) |>
+  add_difference()
+
+tbl_summary_3b
+```
+
+`add_difference()` calcule la **différence de moyennes** (variables continues) ou la **différence de proportions** (variables catégorielles) entre les deux groupes.
+
+## `add_overall()`, `add_n()`, `add_stat_label()`
+
+```{r}
+tbl_summary_3c <-
+  sm_trial |>
+  tbl_summary(by = trt, missing = "no") |>
+  add_overall() |>                                  # Colonne "Total"
+  add_n() |>                                        # Colonne effectifs
+  add_stat_label(
+    label = all_categorical() ~ "n (%)"             # Label des stats catégorielles
+  )
+
+tbl_summary_3c
+```
+
+| Fonction | Effet |
+|----------|-------|
+| `add_overall()` | Ajoute une colonne de statistiques globales |
+| `add_n()` | Ajoute le nombre d'observations non-manquantes |
+| `add_stat_label()` | Ajoute une description des statistiques reportées |
+
+---
+
+# Fonctions `bold_*()` et `italicize_*()` — Mise en forme
+
+```{r}
+tbl_summary_4 <-
+  sm_trial |>
+  tbl_summary(by = trt) |>
+  add_p() |>
+  bold_labels() |>        # Labels en gras
+  italicize_labels() |>   # Labels en italique
+  bold_p(t = 0.05)        # P-values < 0.05 en gras
+
+tbl_summary_4
+```
+
+| Fonction | Effet |
+|----------|-------|
+| `bold_labels()` | Met les labels des variables en **gras** |
+| `italicize_labels()` | Met les labels en *italique* |
+| `italicize_levels()` | Met les modalités en italique |
+| `bold_p(t = 0.05)` | Met en gras les p-values inférieures au seuil |
+
+---
+
+# Fonctions `modify_*()` — Modifier l'en-tête
+
+```{r}
+tbl_summary_5 <-
+  sm_trial |>
+  select(age, response, trt) |>
+  tbl_summary(by = trt, missing = "no") |>
+  modify_header(
+    update = list(
+      stat_1 ~ "**A**",
+      stat_2 ~ "**B**"
+    )
+  ) |>
+  modify_spanning_header(
+    update = all_stat_cols() ~ "**Traitement**"
+  ) |>
+  modify_footnote(
+    update = all_stat_cols() ~
+      "Médiane (IQR) pour les variables continues ; n (%) pour les catégorielles"
+  )
+
+tbl_summary_5
+```
+
+> 💡 Utilisez `show_header_names(tbl)` pour voir les noms internes disponibles dans `modify_header()`.
+
+---
+
+# `tbl_cross()` — Tableau croisé
+
+```{r}
+tbl_cross_1 <-
+  sm_trial |>
+  tbl_cross(
+    row     = trt,
+    col     = grade,
+    percent = "row",     # Pourcentages par ligne
+    margin  = "row"      # Totaux par ligne
+  ) |>
+  add_p(source_note = TRUE)
+
+tbl_cross_1
+```
+
+`tbl_cross()` est un wrapper de `tbl_summary()` optimisé pour les tableaux **n × m** entre deux variables catégorielles.
+
+---
+
+# `tbl_svysummary()` — Données d'enquête pondérées
+
+```{r}
+tbl_survey <-
+  survey::svydesign(
+    ids     = ~1,
+    data    = as.data.frame(Titanic),
+    weights = ~Freq
+  ) |>
+  tbl_svysummary(by = Survived) |>
+  add_p() |>
+  modify_spanning_header(
+    all_stat_cols() ~ "**Survie**"
+  )
+
+tbl_survey
+```
+
+`tbl_svysummary()` prend en compte les **poids de sondage** pour calculer les statistiques pondérées.
+
+---
+
+# `tbl_survfit()` — Analyse de survie
+
+```{r}
+fit <- survfit(Surv(ttdeath, death) ~ trt, data = trial)
+
+tbl_survfit_1 <-
+  tbl_survfit(
+    fit,
+    times        = c(12, 24),
+    label_header = "**{time} mois**"
+  ) |>
+  add_p()
+
+tbl_survfit_1
+```
+
+`tbl_survfit()` affiche les **probabilités de survie** aux temps spécifiés, avec test du log-rank via `add_p()`.
+
+---
+
+# `tbl_regression()` — Modèles de régression
+
+## Modèle classique vs {gtsummary}
+
+```{r}
+# Modèle logistique
+ml <- glm(
+  response ~ age + stage,
+  data   = trial,
+  family = binomial(link = "logit")
+)
+
+# Sortie brute (difficile à lire)
+summary(ml)
+```
+
+```{r}
+# Sortie gtsummary — claire et publiable
+ml_tbl_1 <- tbl_regression(ml)
+ml_tbl_1
+```
+
+## Personnalisation de `tbl_regression()`
+
+```{r}
+ml_tbl_2 <-
+  tbl_regression(
+    ml,
+    exponentiate = TRUE          # Affiche les Odds Ratios
+  ) |>
+  add_global_p() |>              # P-value globale par variable
+  add_glance_table(
+    include = c(nobs, logLik, AIC, BIC)   # Indicateurs de qualité d'ajustement
+  )
+
+ml_tbl_2
+```
+
+| Argument / Fonction | Effet |
+|---------------------|-------|
+| `exponentiate = TRUE` | Odds Ratios (logistique) ou Hazard Ratios (Cox) |
+| `add_global_p()` | P-value globale par variable (test du rapport de vraisemblance) |
+| `add_glance_table()` | Indicateurs : N, logLik, AIC, BIC |
+
+## Modèles supportés
+
+`tbl_regression()` est compatible avec plus de 20 types de modèles :
+
+```
+lm(), glm(), aov(), coxph(), survreg(), lmer(), glmer(),
+multinom(), svyglm(), brm(), geeglm(), polr(), glm.nb(),
+lavaan(), crr(), vglm()... et plus encore.
+```
+
+Des **tidiers personnalisés** peuvent être passés via l'argument `tidy_fun =`.
+
+---
+
+# `tbl_uvregression()` — Modèles univariés en série
+
+```{r}
+tbl_uvreg <-
+  sm_trial |>
+  tbl_uvregression(
+    method      = glm,
+    y           = response,
+    method.args = list(family = binomial),
+    exponentiate = TRUE
+  )
+
+tbl_uvreg
+```
+
+`tbl_uvregression()` ajuste **un modèle par variable** et présente tous les résultats en un seul tableau.
+
+---
+
+# `inline_text()` — Reporting dans le texte
+
+Les statistiques d'un tableau `{gtsummary}` peuvent être **citées directement dans le texte** R Markdown.
+
+```{r eval=FALSE}
+# Extraction d'une statistique inline
+inline_text(tbl_uvreg, variable = age)
+# Résultat : "1.02 (95% IC 1.00, 1.04 ; p=0.10)"
+```
+
+**Dans le texte R Markdown :**
+
+```
+L'odds ratio pour l'âge est `r inline_text(tbl_uvreg, variable = age)`.
+```
+
+**Rendu :** L'odds ratio pour l'âge est 1.02 (95% IC 1.00, 1.04 ; p=0.10).
+
+Le format peut être modifié avec l'argument `pattern` :
+
+```{r eval=FALSE}
+inline_text(tbl_uvreg,
+            variable = age,
+            pattern  = "OR = {estimate} ({conf.level*100}% IC : {conf.low}–{conf.high})")
+```
+
+---
+
+# `tbl_merge()` et `tbl_stack()` — Combiner des tableaux
+
+## `tbl_merge()` — Côte à côte
+
+```{r}
+# Modèle univarié Cox
+tbl_unsurv <-
+  trial |>
+  select(age, grade, death, ttdeath) |>
+  tbl_uvregression(
+    method       = coxph,
+    y            = Surv(ttdeath, death),
+    exponentiate = TRUE
+  ) |>
+  add_global_p()
+
+# Modèle multivarié Cox
+tbl_mvsurv <-
+  coxph(Surv(ttdeath, death) ~ age + grade, data = trial) |>
+  tbl_regression(exponentiate = TRUE) |>
+  add_global_p()
+
+# Fusion côte à côte
+tbl_merge(
+  list(tbl_unsurv, tbl_mvsurv),
+  tab_spanner = c("**Univarié**", "**Multivarié**")
+)
+```
+
+## `tbl_stack()` — Empilés verticalement
+
+```{r}
+# Modèle non ajusté
+t3 <-
+  coxph(Surv(ttdeath, death) ~ trt, data = trial) |>
+  tbl_regression(
+    show_single_row = trt,
+    label           = trt ~ "Drug B vs A",
+    exponentiate    = TRUE
+  )
+
+# Modèle ajusté (présentation du seul coefficient d'intérêt)
+t4 <-
+  coxph(Surv(ttdeath, death) ~ trt + grade + stage + marker, data = trial) |>
+  tbl_regression(
+    show_single_row = trt,
+    label           = trt ~ "Drug B vs A",
+    exponentiate    = TRUE,
+    include         = "trt"       # Afficher seulement trt dans la table
+  )
+
+# Empilement vertical
+tbl_stack(
+  list(t3, t4),
+  group_header = c("Non ajusté", "Ajusté")
+)
+```
+
+---
+
+# `tbl_strata()` — Tableaux stratifiés
+
+```{r}
+sm_trial |>
+  mutate(grade = paste("Grade", grade)) |>
+  tbl_strata(
+    strata = grade,
+    ~tbl_summary(.x, by = trt, missing = "no") |>
+      modify_header(all_stat_cols() ~ "**{level}**")
+  )
+```
+
+`tbl_strata()` applique une fonction de tableau à chaque niveau d'une variable de stratification.
+
+---
+
+# Thèmes {gtsummary}
+
+Les thèmes permettent de **standardiser l'apparence** des tableaux à travers tout un projet.
+
+## Thème par défaut
+
+```{r}
+reset_gtsummary_theme()
+
+tbl_regression(ml, exponentiate = TRUE) |>
+  modify_caption("Thème par défaut")
+```
+
+## Thème journal (JAMA, NEJM…)
+
+```{r}
+reset_gtsummary_theme()
+theme_gtsummary_journal(journal = "jama")
+
+tbl_regression(ml, exponentiate = TRUE) |>
+  modify_caption("Thème JAMA")
+```
+
+## Thème compact
+
+```{r}
+reset_gtsummary_theme()
+theme_gtsummary_compact()   # Réduit marges et taille de police
+
+tbl_regression(ml, exponentiate = TRUE) |>
+  modify_caption("Thème compact")
+```
+
+## Thème multilingue
+
+```{r eval=FALSE}
+reset_gtsummary_theme()
+theme_gtsummary_language(language = "fr")   # Français
+
+tbl_regression(ml, exponentiate = TRUE) |>
+  modify_caption("Thème en français")
+```
+
+## Thème personnalisé avec `set_gtsummary_theme()`
+
+```{r eval=FALSE}
+library(rlang)
+
+mon_theme <- list(
+  # Arrondir les p-values à 2 décimales
+  "pkgwide-fn:pvalues_fun" = function(x) gtsummary::style_pvalue(x, digits = 2),
+
+  # Personnalisations gt
+  "as_gt-list:addl_cmds" = list(
+    tab_spanner = expr(gt::tab_options(table.font.size = "small")),
+    user_titre  = expr(gt::tab_header(
+      title    = "Mon Institution",
+      subtitle = "Usage interne uniquement"
+    )),
+    user_note   = expr(gt::tab_source_note(
+      source_note = paste("Tableau généré le", Sys.Date())
+    )),
+    user_strip  = expr(gt::opt_row_striping()),
+    user_lines  = expr(gt::opt_table_lines("none"))
+  )
+)
+
+set_gtsummary_theme(mon_theme)
+```
+
+---
+
+# Moteurs d'impression (Print Engines)
+
+`{gtsummary}` peut exporter vers plusieurs formats :
+
+```{r eval=FALSE}
+# gt (HTML interactif, PDF via LaTeX)
+tbl |> as_gt()
+
+# flextable (Word, PowerPoint)
+tbl |> as_flex_table()
+
+# kableExtra (PDF LaTeX, HTML)
+tbl |> as_kable_extra()
+
+# Sauvegarder en PNG
+tbl |> as_gt() |> gt::gtsave("mon_tableau.png")
+```
+
+**Personnalisation avancée avec `{gt}` :**
+
+```{r eval=FALSE}
+library(gt)
+
+trial |>
+  select(age, grade) |>
+  tbl_summary() |>
+  as_gt() |>
+  cols_width(label ~ px(300)) |>
+  cols_align(columns = vars(stat_0), align = "left")
+```
+
+---
+
+# Exercice pratique — Dataset NHEFS
+
+## Préparation des données
+
+```{r eval=FALSE}
+library(causaldata)
+
+theme_gtsummary_compact()
+
+df_nhefs <-
+  causaldata::nhefs |>
+  select(death, qsmk, age, sex, sbp, dbp, exercise) |>
+  drop_na() |>
+  mutate(
+    qsmk = factor(qsmk, levels = 0:1,
+                  labels = c("N'a pas arrêté", "A arrêté")),
+    sex  = case_when(sex == 0 ~ "Homme", sex == 1 ~ "Femme"),
+    exercise = factor(exercise, levels = 0:2,
+                      labels = c("Beaucoup", "Modéré", "Peu ou pas")) |>
+               fct_rev(),
+    death = factor(death, levels = 0:1, labels = c("Non", "Oui")) |>
+            fct_rev()
+  ) |>
+  labelled::set_variable_labels(
+    death    = "Décès",
+    qsmk     = "Arrêt du tabac",
+    age      = "Âge",
+    sex      = "Sexe",
+    sbp      = "Pression artérielle systolique",
+    dbp      = "Pression artérielle diastolique",
+    exercise = "Niveau d'activité physique"
+  )
+```
+
+## Table 1 — Caractéristiques par statut tabagique
+
+```{r eval=FALSE}
+gts_patient_characteristics <-
+  df_nhefs |>
+  tbl_summary(
+    by      = qsmk,
+    include = -death
+  ) |>
+  add_p() |>
+  add_stat_label() |>
+  modify_spanning_header(all_stat_cols() ~ "**Statut tabagique**") |>
+  bold_p() |>
+  add_overall()
+
+gts_patient_characteristics
+```
+
+## Différence de taux de décès (ajustée et non ajustée)
+
+```{r eval=FALSE}
+# Non ajustée
+gts_death_unadjusted <-
+  df_nhefs |>
+  tbl_summary(by = qsmk, include = death,
+              statistic = all_categorical() ~ "{p}%") |>
+  add_difference() |>
+  add_stat_label()
+
+# Ajustée sur les covariables
+gts_death_adjusted <-
+  df_nhefs |>
+  tbl_summary(by = qsmk, include = death,
+              statistic = all_categorical() ~ "{p}%") |>
+  add_difference(
+    test    = all_categorical() ~ "emmeans",
+    adj.vars = c(age, sex, sbp, dbp, exercise)
+  ) |>
+  add_stat_label()
+```
+
+## Régression logistique
+
+```{r eval=FALSE}
+mod <- glm(death ~ qsmk + age + sex + sbp + dbp + exercise,
+           data = df_nhefs, family = binomial)
+
+gts_mod <-
+  tbl_regression(mod, exponentiate = TRUE) |>
+  add_global_p() |>
+  bold_p() |>
+  italicize_levels() |>
+  modify_caption("**Régression logistique — prédiction du décès**") |>
+  modify_header(label = "**Variable** (N = {N})")
+
+gts_mod
+```
+
+## Reporting inline
+
+```{r eval=FALSE}
+median_age_arret <-
+  inline_text(gts_patient_characteristics,
+              variable = age, column = "A arrêté", pattern = "{median}")
+
+or_qsmk <-
+  inline_text(gts_mod, variable = qsmk, level = "A arrêté",
+              pattern = "OR = {estimate} ; IC 95% : {ci}")
+```
+
+**Exemple de texte dans le rapport :**
+
+> L'analyse incluait 1 548 participants. L'âge médian des participants ayant arrêté de fumer était de `r median_age_arret` ans. En analyse multivariée, l'effet de l'arrêt du tabac sur le décès était `r or_qsmk`.
+
+---
+
+# Récapitulatif des fonctions
+
+| Catégorie | Fonction | Rôle |
+|-----------|----------|------|
+| **Tableaux** | `tbl_summary()` | Table descriptive |
+| | `tbl_cross()` | Tableau croisé |
+| | `tbl_regression()` | Modèle de régression |
+| | `tbl_uvregression()` | Modèles univariés en série |
+| | `tbl_survfit()` | Survie |
+| | `tbl_svysummary()` | Données d'enquête |
+| **Enrichissement** | `add_p()` | P-values |
+| | `add_q()` | P-values ajustées |
+| | `add_difference()` | Différences entre groupes |
+| | `add_overall()` | Colonne globale |
+| | `add_n()` | Effectifs |
+| | `add_global_p()` | P-value globale |
+| | `add_glance_table()` | AIC, BIC, logLik… |
+| **Mise en forme** | `bold_labels()` | Labels en gras |
+| | `italicize_levels()` | Niveaux en italique |
+| | `bold_p()` | P-values significatives en gras |
+| **Modification** | `modify_header()` | En-têtes de colonnes |
+| | `modify_spanning_header()` | En-tête groupé |
+| | `modify_footnote()` | Note de bas de tableau |
+| | `modify_caption()` | Titre du tableau |
+| **Combinaison** | `tbl_merge()` | Côte à côte |
+| | `tbl_stack()` | Empilés verticalement |
+| | `tbl_strata()` | Stratifiés |
+| **Reporting** | `inline_text()` | Statistiques dans le texte |
+| **Thèmes** | `theme_gtsummary_journal()` | Thème journal |
+| | `theme_gtsummary_compact()` | Thème compact |
+| | `set_gtsummary_theme()` | Thème personnalisé |
+
+---
+
+# Ressources
+
+- 📖 Documentation : <https://www.danieldsjoberg.com/gtsummary/>
+- 📋 Référence des fonctions : <https://www.danieldsjoberg.com/gtsummary/reference/index.html>
+- 📝 Vignette `tbl_summary()` : <https://www.danieldsjoberg.com/gtsummary/articles/tbl_summary.html>
+- 🧪 Exercices et solutions : <https://www.danieldsjoberg.com/clinical-reporting-gtsummary-rmed/exercises/solutions.html>
+- 📌 Tests disponibles : <https://www.danieldsjoberg.com/gtsummary/reference/tests.html>
+
+**Citation :**
+
+> Sjoberg DD, Whiting K, Curry M, Lavery JA, Larmarange J. Reproducible summary tables with the gtsummary package. *The R Journal* 2021;13:570–80. <https://doi.org/10.32614/RJ-2021-053>
