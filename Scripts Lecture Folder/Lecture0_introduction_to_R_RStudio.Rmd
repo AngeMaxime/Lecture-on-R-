@@ -1,0 +1,403 @@
+---
+title: "Lecture 00_Introduction to R and RStudio"
+author: "Ange Maxime TCHOUTANG"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    number_sections: true
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,         # Show R code in the output
+  message = FALSE,     # Suppress package messages
+  warning = FALSE,     # Suppress warnings
+  comment = "#>"       # Prefix for output lines
+)
+```
+
+---
+
+# Introduction
+
+Welcome to the first lecture of this data science course using R. Before diving into data manipulation, visualization, or modeling, we need to set up a solid foundation by understanding the tools we will be working with every day.
+
+By the end of this lecture, you will be able to:
+
+- Understand what R is and why it is widely used in data science
+- Understand the role of RStudio as a development environment
+- Navigate the RStudio interface confidently
+- Know the main application domains where R is used
+- Write and run your first R commands
+
+---
+
+# What is R?
+
+## Definition
+
+**R** is a free, open-source **programming language and software environment** designed specifically for **statistical computing, data analysis, and graphical visualization**.
+
+It was first developed in the early 1990s by **Ross Ihaka** and **Robert Gentleman** at the University of Auckland, New Zealand — which is where the name "R" comes from (the first letter of both authors' first names). It was also inspired by an earlier language called **S**, developed at Bell Laboratories.
+
+Today, R is maintained by the **R Core Team** and is distributed freely through the **Comprehensive R Archive Network (CRAN)** at [https://cran.r-project.org](https://cran.r-project.org).
+
+## Key characteristics of R
+
+| Feature | Description |
+|---|---|
+| **Free & open-source** | No license cost; source code is publicly available |
+| **Cross-platform** | Runs on Windows, macOS, and Linux |
+| **Interpreted language** | Commands are executed line by line, interactively |
+| **Vectorized** | Operations apply to entire datasets, not just individual values |
+| **Extensible** | Thousands of packages available via CRAN, Bioconductor, and GitHub |
+| **Active community** | Large global community of users and developers |
+
+## R vs other languages
+
+R is not the only language used in data science. Here is how it compares to the most common alternatives:
+
+| | **R** | **Python** | **Excel** |
+|---|---|---|---|
+| Primary use | Statistics & data analysis | General purpose + data science | Spreadsheet & business reporting |
+| Visualization | Excellent (ggplot2) | Good (matplotlib, seaborn) | Basic |
+| Statistical modeling | Excellent (built-in) | Good (scikit-learn, statsmodels) | Limited |
+| Learning curve | Moderate | Moderate | Low |
+| Cost | Free | Free | Paid (Microsoft 365) |
+| Reproducibility | High (R Markdown) | High (Jupyter) | Low |
+
+> **Note:** R and Python are often used together in data science workflows. Knowing R is a strong asset, particularly in academia, biostatistics, econometrics, and social sciences.
+
+## A quick first look at R code
+
+Let's verify that R is working and explore a few basic operations:
+
+```{r first-commands}
+# Basic arithmetic
+2 + 3
+10 / 4
+2^8   # 2 to the power of 8
+
+# Creating a variable
+my_name <- "Data Scientist"
+print(my_name)
+
+# Creating a numeric vector
+ages <- c(23, 31, 27, 45, 19, 38)
+ages
+
+# Summary statistics in one line
+summary(ages)
+```
+
+Even from these few lines, you can already see that R is clean, readable, and powerful. The `<-` symbol is the standard **assignment operator** in R (it assigns a value to a variable name).
+
+---
+
+# What is RStudio?
+
+## Definition
+
+**RStudio** is a free, open-source **Integrated Development Environment (IDE)** for R. Think of it as the cockpit from which you pilot R.
+
+While R itself can be used from a basic terminal window, RStudio provides a much more comfortable and productive environment with:
+
+- A code editor with syntax highlighting and auto-completion
+- A console to run R commands interactively
+- A file browser and project manager
+- Built-in tools for viewing plots, data, and help documentation
+- Support for R Markdown, version control (Git), and much more
+
+> **Important distinction:** R and RStudio are two separate pieces of software. R is the engine; RStudio is the dashboard. You need to install R first, then RStudio on top of it.
+
+## Installing R and RStudio
+
+1. **Install R** from CRAN: [https://cran.r-project.org](https://cran.r-project.org)
+   - Choose your operating system and follow the installer instructions.
+
+2. **Install RStudio Desktop** (free version): [https://posit.co/download/rstudio-desktop](https://posit.co/download/rstudio-desktop)
+   - RStudio will automatically detect your R installation.
+
+---
+
+# The RStudio Interface
+
+When you first open RStudio, you are greeted by an interface divided into **four main panes**. Understanding each one is key to working efficiently.
+
+## The Four Panes
+
+```
++---------------------------+---------------------------+
+|                           |                           |
+|   1. SOURCE EDITOR        |   3. ENVIRONMENT /        |
+|   (Scripts & R Markdown)  |      HISTORY              |
+|                           |                           |
++---------------------------+---------------------------+
+|                           |                           |
+|   2. CONSOLE              |   4. FILES / PLOTS /      |
+|   (Interactive R)         |      PACKAGES / HELP      |
+|                           |                           |
++---------------------------+---------------------------+
+```
+
+### Pane 1 — The Source Editor (top-left)
+
+This is where you **write and save your R scripts or R Markdown files**. Code written here is not executed until you explicitly run it (using `Ctrl+Enter` on a selected line, or `Ctrl+Shift+Enter` to run the whole file).
+
+Key features:
+- Syntax highlighting (R, Python, SQL, Markdown, and more)
+- Auto-completion with `Tab`
+- Line numbers
+- Code folding (collapse/expand sections)
+- Direct knitting of R Markdown files via the **Knit** button
+
+### Pane 2 — The Console (bottom-left)
+
+The console is the **direct interface with R**. Any command typed here is executed immediately when you press `Enter`. It shows the output of your code, messages, warnings, and errors.
+
+```{r console-demo}
+# Try typing these directly in the console:
+cat("Hello, R World!\n")
+Sys.time()   # Current date and time
+R.version$version.string   # Your R version
+```
+
+You can use the **up arrow** key in the console to recall previously typed commands — very handy!
+
+### Pane 3 — Environment / History (top-right)
+
+This pane has two key tabs:
+
+- **Environment tab** — shows all objects currently loaded in your R session (variables, data frames, functions, etc.). You can click on any object to inspect it.
+- **History tab** — a log of every command you have run in the current session.
+
+```{r environment-demo}
+# Create some objects and watch them appear in the Environment pane
+x <- 42
+my_vector <- c(1, 2, 3, 4, 5)
+my_dataframe <- data.frame(
+  name  = c("Alice", "Bob", "Charlie"),
+  score = c(88, 92, 75)
+)
+
+# View the data frame
+my_dataframe
+```
+
+### Pane 4 — Files / Plots / Packages / Help (bottom-right)
+
+This pane is a multi-purpose hub with several tabs:
+
+| Tab | Purpose |
+|---|---|
+| **Files** | Navigate your computer's file system, set working directory |
+| **Plots** | View graphics and plots generated by your code |
+| **Packages** | Browse, install, and load R packages |
+| **Help** | Read documentation for any R function |
+| **Viewer** | Preview HTML outputs, R Markdown documents, Shiny apps |
+
+```{r first-plot}
+# A simple plot — watch it appear in the Plots tab!
+barplot(
+  height = c(88, 92, 75),
+  names.arg = c("Alice", "Bob", "Charlie"),
+  col = c("#3498db", "#2ecc71", "#e74c3c"),
+  main = "Student Scores",
+  ylab = "Score",
+  ylim = c(0, 100)
+)
+```
+
+## Useful Keyboard Shortcuts
+
+Mastering these shortcuts will significantly speed up your workflow:
+
+| Action | Windows / Linux | macOS |
+|---|---|---|
+| Run current line / selection | `Ctrl + Enter` | `Cmd + Enter` |
+| Run entire script | `Ctrl + Shift + Enter` | `Cmd + Shift + Enter` |
+| Insert `<-` (assignment) | `Alt + -` | `Option + -` |
+| Insert pipe `%>%` | `Ctrl + Shift + M` | `Cmd + Shift + M` |
+| New R script | `Ctrl + Shift + N` | `Cmd + Shift + N` |
+| Save file | `Ctrl + S` | `Cmd + S` |
+| Comment / uncomment lines | `Ctrl + Shift + C` | `Cmd + Shift + C` |
+| Knit R Markdown document | `Ctrl + Shift + K` | `Cmd + Shift + K` |
+| Clear console | `Ctrl + L` | `Ctrl + L` |
+
+## RStudio Projects
+
+A very important feature in RStudio is the concept of a **Project** (`.Rproj` file). A project:
+
+- Keeps all your scripts, data, and outputs for one analysis in the same folder
+- Automatically sets the working directory to that folder
+- Integrates with Git for version control
+- Makes your work **fully reproducible and portable**
+
+> **Best practice:** Always work inside an RStudio Project. Go to **File → New Project** to create one.
+
+---
+
+# Applications of R
+
+R is used across a wide range of fields. Here is an overview of its most important application domains, with code examples.
+
+## Statistics and Data Analysis
+
+This is R's home territory. R was born as a statistical language, and it remains the gold standard for statistical analysis.
+
+```{r statistics}
+# Generate sample data
+set.seed(42)
+group_A <- rnorm(n = 30, mean = 70, sd = 10)
+group_B <- rnorm(n = 30, mean = 75, sd = 12)
+
+# Descriptive statistics
+cat("--- Group A ---\n")
+cat("Mean:", round(mean(group_A), 2), "\n")
+cat("SD:  ", round(sd(group_A), 2), "\n")
+
+cat("\n--- Group B ---\n")
+cat("Mean:", round(mean(group_B), 2), "\n")
+cat("SD:  ", round(sd(group_B), 2), "\n")
+
+# Inferential statistics: two-sample t-test
+t.test(group_A, group_B)
+```
+
+## Data Visualization
+
+R's `ggplot2` package is one of the most powerful and elegant data visualization tools available in any language.
+
+```{r visualization}
+# Install ggplot2 if needed: install.packages("ggplot2")
+library(ggplot2)
+
+# Using the built-in 'mtcars' dataset
+ggplot(data = mtcars, aes(x = wt, y = mpg, color = factor(cyl))) +
+  geom_point(size = 3, alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_color_manual(
+    values = c("4" = "#3498db", "6" = "#2ecc71", "8" = "#e74c3c"),
+    name = "Cylinders"
+  ) +
+  labs(
+    title = "Car Weight vs. Fuel Efficiency",
+    subtitle = "Data from the mtcars dataset",
+    x = "Weight (1000 lbs)",
+    y = "Miles per Gallon (mpg)"
+  ) +
+  theme_minimal()
+```
+
+## Data Manipulation and Wrangling
+
+The `tidyverse` ecosystem (especially `dplyr` and `tidyr`) makes cleaning and transforming data fast and readable.
+
+```{r data-wrangling}
+# Install if needed: install.packages("dplyr")
+library(dplyr)
+
+# Using the built-in 'iris' dataset
+iris %>%
+  group_by(Species) %>%
+  summarise(
+    Count        = n(),
+    Mean_Length  = round(mean(Sepal.Length), 2),
+    Mean_Width   = round(mean(Sepal.Width), 2),
+    SD_Length    = round(sd(Sepal.Length), 2)
+  ) %>%
+  arrange(desc(Mean_Length))
+```
+
+## Machine Learning and Predictive Modeling
+
+R has robust tools for machine learning, from classical models to modern frameworks like `tidymodels` and `caret`.
+
+```{r machine-learning}
+# Simple linear regression on the built-in 'mtcars' dataset
+model <- lm(mpg ~ wt + hp + cyl, data = mtcars)
+
+# Model summary
+summary(model)
+
+# Predictions vs actual values
+predictions <- predict(model, mtcars)
+comparison <- data.frame(
+  Actual    = mtcars$mpg,
+  Predicted = round(predictions, 2),
+  Residual  = round(mtcars$mpg - predictions, 2)
+)
+head(comparison, 8)
+```
+
+## Reproducible Reports with R Markdown
+
+The file you are reading right now **is** an R Markdown document — a living example of this application. R Markdown allows you to:
+
+- Mix narrative text with executable R code
+- Generate outputs in HTML, PDF, Word, and more
+- Build dashboards (with `flexdashboard`) and interactive apps (with `Shiny`)
+- Automate the full pipeline from raw data to final report
+
+This makes your analyses fully **transparent, reproducible, and shareable**.
+
+## Other Notable Application Domains
+
+| Domain | Example use cases |
+|---|---|
+| **Bioinformatics** | Genomics, RNA-seq analysis (Bioconductor packages) |
+| **Econometrics** | Time series, panel data, financial modeling |
+| **Social sciences** | Survey analysis, text mining, network analysis |
+| **Public health & epidemiology** | Disease surveillance, survival analysis |
+| **Geospatial analysis** | Maps and spatial data with `sf`, `leaflet`, `tmap` |
+| **Web scraping** | Collecting web data with `rvest` |
+| **Interactive dashboards** | Building web apps with `Shiny` |
+
+---
+
+# Summary
+
+Let's recap what was covered in this lecture:
+
+- ✅ **R** is a free, open-source language built for statistical computing and data analysis.
+- ✅ **RStudio** is an IDE that makes working with R much more productive through its four-pane layout, project management, and built-in tools.
+- ✅ The **four panes** of RStudio serve distinct purposes: Source Editor, Console, Environment/History, and Files/Plots/Packages/Help.
+- ✅ R is used across many domains including **statistics, visualization, machine learning, bioinformatics, economics**, and **reproducible reporting**.
+
+---
+
+# Exercises
+
+Try the following on your own to consolidate what you have learned:
+
+1. Open RStudio and confirm your R version using `R.version$version.string` in the console.
+2. Create a variable `my_age` and assign your age to it. Then multiply it by 2.
+3. Create a vector of 5 country names and display it.
+4. Use the `summary()` function on the built-in `iris` dataset (`summary(iris)`).
+5. Create a new RStudio Project for this course in a folder on your computer.
+
+---
+
+# Further Reading & Resources
+
+- 📘 [R for Data Science (free online book)](https://r4ds.hadley.nz/) — Hadley Wickham & Garrett Grolemund
+- 📘 [The R Markdown Cookbook](https://bookdown.org/yihui/rmarkdown-cookbook/) — Yihui Xie
+- 🌐 [CRAN — The R Project](https://cran.r-project.org)
+- 🌐 [RStudio Cheat Sheets](https://posit.co/resources/cheatsheets/) — Quick reference cards for key packages
+- 🌐 [Stack Overflow — R tag](https://stackoverflow.com/questions/tagged/r) — Community Q&A
+
+---
+
+```{r session-info, echo=FALSE}
+cat("Session Info\n")
+cat("============\n")
+sessionInfo()
+```
